@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nugget Fuel</title>
+<style>
+  :root { --gold:#d32f2f; --ink:#0b1f4d; --bg:#f4f4f1; --card:#fff; --text:#1b1b1f; --muted:#6b6f78; --line:#e3e3de; --bad:#c62828; --badbg:#fdecea; --good:#2e7d32; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121214; --card:#1d1d21; --text:#f0f0ee; --muted:#9a9ea8; --line:#34343a; --bad:#ff8a80; --badbg:#3a1f1f; --good:#81c784; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--ink); color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:5; border-bottom:3px solid var(--gold); gap:10px; flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:18px; }
+  .brand b { color:var(--gold); }
+  header button { background:transparent; color:#fff; border:1px solid #555; padding:6px 12px; }
+  main { max-width:960px; margin:16px auto; padding:0 14px 40px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  h2 { margin:0 0 6px; font-size:19px } h3 { margin:18px 0 8px }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+  input, select { width:100%; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:17px; }
+  input:focus { outline:2px solid var(--gold); }
+  button { padding:11px 18px; border:0; border-radius:8px; background:var(--gold); color:#fff; font-weight:700; cursor:pointer; font-size:15px; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  button.wide { width:100%; padding:14px; font-size:16px; margin-top:14px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .chip { background:var(--bg); border:2px solid var(--line); color:var(--text); }
+  .chip.on { border-color:var(--gold); background:var(--gold); color:#fff; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tabs button { flex:1; background:var(--card); border:1px solid var(--line); color:var(--text); }
+  .tabs button.on { background:var(--gold); color:#fff; border-color:var(--gold); }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  @media (max-width:560px) { .grid3 { grid-template-columns:1fr; } }
+  .info { background:var(--bg); border-radius:8px; padding:10px 12px; font-size:14px; margin-top:10px; line-height:1.5; }
+  .hint { font-size:13px; min-height:18px; margin-top:4px; color:var(--muted); }
+  .neg, .hint.neg { color:var(--bad); }
+  .warn { background:var(--badbg); color:var(--bad); border-radius:8px; padding:10px 12px; margin-top:12px; font-size:14px; }
+  .ok { color:var(--good); margin-top:10px; } .err { color:var(--bad); margin-top:10px; }
+  .meta, small { color:var(--muted); font-size:12px; }
+  .badge { background:var(--gold); color:#fff; border-radius:4px; padding:1px 6px; font-size:11px; font-weight:700; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th, td { padding:8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; vertical-align:top; }
+  th.l, td.l { text-align:left; }
+  th { color:var(--muted); font-size:12px; font-weight:600; }
+  td small { display:block; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--gold); border-radius:10px; padding:12px; }
+  .tile b { display:block; font-size:22px; margin-top:4px; }
+  .bar { display:grid; grid-template-columns:150px 1fr 90px; gap:8px; align-items:center; margin:6px 0; font-size:13px; }
+  .bar i { color:var(--muted); font-style:normal; display:block; font-size:11px; }
+  .bar b { text-align:right; }
+  .track { background:var(--bg); border-radius:6px; height:16px; overflow:hidden; }
+  .fill { background:#2c4a9a; height:100%; } .fill.neg { background:var(--bad); }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; } .row > div { flex:1; min-width:150px; }
+  .hidden { display:none }
+
+  .sheethead { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:6px; }
+  .sheethead small { display:block } .sheethead b { font-size:17px }
+  .sheetT input { padding:8px; font-size:16px; min-width:92px; text-align:right; }
+  .sheetT tr.diff td { border-top:2px solid var(--text); font-weight:800; font-size:17px; }
+  .cashbox div { display:flex; justify-content:space-between; padding:6px 0; }
+  .cashbox .total { border-top:2px solid var(--text); font-size:20px; font-weight:800; margin-top:4px; }
+  .fillrow { display:grid; grid-template-columns:150px 1.2fr 1.2fr 1fr 90px 90px auto; gap:8px; align-items:end; }
+  @media (max-width:760px) { .fillrow { grid-template-columns:1fr 1fr; } }
+  .amt { padding:12px 0; font-weight:700; font-size:17px; }
+  .x { background:transparent; border:1px solid var(--line); color:var(--bad); padding:4px 10px; }
+  .priceline { font-size:18px; margin:14px 0 8px; padding:8px 12px; background:var(--bg); border-left:4px solid var(--gold); border-radius:6px; }
+  .sumT tr.diff td { border-top:2px solid var(--text); font-weight:800; }
+  .sumT tr.sub td { font-size:13px; color:var(--muted); padding-top:2px; padding-bottom:2px; }
+  .pw { display:flex; gap:8px; } .pw input { flex:1; } .pw button { min-width:70px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 32 32"><path d="M5 20 9 10 18 5 27 12 28 22 19 27 9 26Z" fill="#d32f2f" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 12 17 10 22 15" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span>NUGGET <b>FUEL</b></span>
+  </div>
+  <div id="who"></div>
+</header>
+<main>
+
+<section id="login" class="card">
+  <h2>Sign in</h2>
+  <div id="regOk" class="ok"></div>
+  <label>Username or phone number</label><input id="u" value="alice" autocomplete="username">
+  <label>Password</label>
+  <div class="pw"><input id="p" type="password" value="password" autocomplete="current-password"><button type="button" class="ghost" onclick="togglePw('p', this)">Show</button></div>
+  <button class="wide" onclick="login()">Sign in</button>
+  <div id="loginErr" class="err"></div>
+  <p class="meta">Demo users: alice, bob (attendants), manager. Password: password</p>
+  <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+  <p class="meta">New fuel attendant?</p>
+  <button class="ghost wide" style="margin-top:6px" onclick="showRegister(true)">Create an account</button>
+</section>
+
+<section id="register" class="card hidden">
+  <h2>Create your account</h2>
+  <p class="meta">Your phone number will be your username.</p>
+  <div class="row">
+    <div><label>First name</label><input id="r_first" autocomplete="given-name"></div>
+    <div><label>Surname</label><input id="r_last" autocomplete="family-name"></div>
+  </div>
+  <label>Phone number</label><input id="r_phone" type="tel" inputmode="tel" placeholder="e.g. 0771234567" autocomplete="tel">
+  <label>Branch you work at</label><select id="r_branch"></select>
+  <label>Create password (at least 6 characters)</label>
+  <div class="pw"><input id="r_pw" type="password" autocomplete="new-password" oninput="pwCheck()"><button type="button" class="ghost" onclick="togglePw('r_pw', this)">Show</button></div>
+  <label>Confirm password</label>
+  <div class="pw"><input id="r_pw2" type="password" autocomplete="new-password" oninput="pwCheck()"><button type="button" class="ghost" onclick="togglePw('r_pw2', this)">Show</button></div>
+  <div id="pwMsg" class="hint"></div>
+  <button class="wide" onclick="register()">Create account</button>
+  <div id="regErr" class="err"></div>
+  <button class="ghost wide" style="margin-top:8px" onclick="showRegister(false)">Back to sign in</button>
+</section>
+
+<section id="attendant" class="hidden">
+  <div class="tabs"><button id="t_entry" class="on" onclick="showTab('entry')">Today’s page</button><button id="t_hist" onclick="showTab('hist')">My history</button></div>
+
+  <div id="entry">
+    <div class="card">
+      <div class="sheethead">
+        <div><small>Fuel attendant</small><b id="aname"></b></div>
+        <div><small>Date</small><b id="adate"></b></div>
+        <div><small>Station</small><b id="astation"></b></div>
+      </div>
+      <label>Pump</label><div id="chips" class="chips"></div>
+      <div id="info" class="info"></div>
+      <div id="setupBox" class="hidden"><label>Date of these readings (the previous day)</label><input id="sdate" type="date"></div>
+      <div id="priceLine" class="priceline"></div>
+      <div class="scroll"><table class="sheetT">
+        <tr><th class="l"></th><th>Manual</th><th>Volume (L)</th><th>Sales ($)</th></tr>
+        <tr><td class="l"><b>Closing today</b></td>
+          <td><input id="c_manual" type="number" inputmode="decimal" step="0.01" min="0" oninput="live()"></td>
+          <td><input id="c_volume" type="number" inputmode="decimal" step="0.01" min="0" oninput="live()"></td>
+          <td><input id="c_sales" type="number" inputmode="decimal" step="0.01" min="0" oninput="live()"></td></tr>
+        <tr><td class="l" id="prevLabel"></td><td id="p_manual"></td><td id="p_volume"></td><td id="p_sales"></td></tr>
+        <tr class="diff"><td class="l">Difference</td><td id="d_manual">-</td><td id="d_volume">-</td><td id="d_sales">-</td></tr>
+      </table></div>
+      <div id="check" class="hint"></div>
+      <div id="expBox" class="hidden"><div class="grid3">
+        <div><label>Attendant’s lunch ($)</label><input id="lunch" type="number" inputmode="decimal" step="0.01" min="0"></div>
+        <div id="transWrap" class="hidden"><label>Transport money ($) - Mondays only</label><input id="transport" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      </div></div>
+      <div id="warn" class="warn hidden"></div>
+      <button id="go" class="wide" onclick="submitReading()">Submit</button>
+      <div id="msg"></div>
+    </div>
+
+    <div id="fillsCard" class="card hidden">
+      <h2>Company cars and creditors</h2>
+      <p class="meta">Fuel given out without cash. Its value (litres × today’s price) is taken off your cash.</p>
+      <div id="fillNote" class="info">Save today’s readings above first, then add the fills here.</div>
+      <div id="fillForm" class="hidden">
+        <div class="fillrow">
+          <div><label>Type</label><select id="ftype"><option value="COMPANY">Company car</option><option value="CREDITOR">Creditor</option></select></div>
+          <div><label>Company / creditor</label><input id="fcomp" placeholder="e.g. Helix"></div>
+          <div><label>Driver’s name</label><input id="fdriver"></div>
+          <div><label>Registration no.</label><input id="freg" placeholder="ABC 1234"></div>
+          <div><label>Litres</label><input id="flit" type="number" inputmode="decimal" step="0.01" min="0" oninput="updateFillPreview()"></div>
+          <div><label>Amount</label><div id="famt" class="amt">$0.00</div></div>
+          <div><button onclick="addFill()">Add</button></div>
+        </div>
+        <div id="fmsg" class="err"></div>
+      </div>
+      <div id="fillList" class="scroll"></div>
+    </div>
+
+    <div id="cashCard" class="card cashbox"></div>
+    <div id="dayTotal" class="card cashbox"></div>
+    <div id="cashDecl" class="card"></div>
+  </div>
+
+  <div id="hist" class="hidden"><div class="card scroll" id="histBody"></div></div>
+</section>
+
+<section id="supervisor" class="hidden">
+  <div class="card"><h2>Supervisor: <span id="supTitle"></span></h2>
+    <p class="meta">You can view every attendant’s page at your branch (view only) and record the stock. Only your own branch is shown.</p></div>
+  <div class="tabs"><button id="sbt_pages" class="on" onclick="showSTab('pages')">Branch pages</button><button id="sbt_stock" onclick="showSTab('stock')">Stock</button><button id="sbt_sum" onclick="showSTab('sum')">Branch summary</button></div>
+  <div id="s_pages">
+    <div class="card"><div class="row"><div><label>Date</label><input id="pgDate" type="date"></div><div style="flex:0"><button onclick="loadPages()">View</button></div></div></div>
+    <div id="pagesBody"></div>
+  </div>
+  <div id="s_stock" class="hidden">
+    <div class="card"><div class="row"><div><label>Date</label><input id="stDate" type="date"></div><div style="flex:0"><button onclick="loadStock()">View</button></div></div></div>
+    <div id="stockBody"></div>
+  </div>
+  <div id="s_sum" class="hidden">
+    <div class="card"><div class="row"><div><label>Date</label><input id="supSumDate" type="date"></div><div style="flex:0"><button onclick="loadSupSummary()">View</button></div></div></div>
+    <div id="supSummary"></div>
+  </div>
+</section>
+
+<section id="manager" class="hidden">
+  <div class="tabs">
+    <button id="mt_sum" class="on" onclick="showMTab('sum')">Daily summary</button>
+    <button id="mt_read" onclick="showMTab('read')">All readings</button>
+    <button id="mt_set" onclick="showMTab('set')">Prices &amp; currencies</button>
+  </div>
+  <div id="m_sum">
+    <div class="card"><div class="row">
+      <div><label>Branch</label><select id="sumStation"></select></div>
+      <div><label>Date</label><input id="sumDate" type="date"></div>
+      <div style="flex:0"><button onclick="loadSummary()">View</button></div>
+    </div></div>
+    <div id="summary"></div>
+  </div>
+  <div id="m_read" class="hidden">
+    <div class="card"><div class="row">
+      <div><label>Station</label><select id="station"></select></div>
+      <div><label>Date</label><input id="date" type="date"></div>
+      <div style="flex:0"><button onclick="loadManager()">View</button></div>
+      <div style="flex:0"><button class="ghost" onclick="exportCsv()">Export CSV</button></div>
+    </div></div>
+    <div id="mgr"></div>
+  </div>
+  <div id="m_set" class="hidden">
+    <div id="prices" class="card"></div>
+    <div id="currencies" class="card"></div>
+  </div>
+</section>
+
+</main>
+<script>
+let auth = null, pumps = [], sel = null, ctx = null, mine = [], warned = false, rows = [], today = '', me = {};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => Number(n).toLocaleString(undefined, {maximumFractionDigits: 2});
+const sgn = n => (n > 0 ? '+' : '') + fmt(n);
+const F = ['manual', 'volume', 'sales'], cap = f => f[0].toUpperCase() + f.slice(1);
+const dfmt = s => s ? new Date(s + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const api = (path, opts = {}) => fetch(path, { ...opts, headers: { 'Authorization': auth, 'Content-Type': 'application/json' } });
+const badge = x => x.firstTimeSetup ? ' <span class="badge">Setup</span>' : '';
+const cell = (o, c) => { const d = c - o; return `<td class="${d < 0 ? 'neg' : ''}"><b>${sgn(d)}</b><small>${fmt(o)} → ${fmt(c)}</small></td>`; };
+const cells = x => F.map(f => cell(x.opening[f], x.closing[f])).join('');
+const head = first => `<tr><th class="l">${first}</th><th>Manual</th><th>Volume</th><th>Sales</th></tr>`;
+
+function togglePw(id, btn) {
+  const el = $(id), show = el.type === 'password';
+  el.type = show ? 'text' : 'password'; btn.textContent = show ? 'Hide' : 'Show';
+}
+
+async function showRegister(on) {
+  $('login').classList.toggle('hidden', on); $('register').classList.toggle('hidden', !on);
+  if (on && $('r_branch').options.length === 0) {
+    const r = await fetch('/api/public/branches');
+    const list = r.ok ? await r.json() : [];
+    $('r_branch').innerHTML = '<option value="">Choose your branch</option>' + list.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  }
+}
+
+function pwCheck() {
+  const a = $('r_pw').value, b = $('r_pw2').value, m = $('pwMsg');
+  m.className = 'hint';
+  if (!a) { m.textContent = ''; return; }
+  if (a.length < 6) { m.textContent = 'The password must be at least 6 characters.'; m.className = 'hint neg'; return; }
+  if (!b) { m.textContent = 'Type the password again to confirm it.'; return; }
+  if (a === b) m.textContent = '✓ The passwords match.'; else { m.textContent = 'The passwords do not match.'; m.className = 'hint neg'; }
+}
+
+async function register() {
+  const err = $('regErr'); err.textContent = '';
+  const body = { firstName: $('r_first').value.trim(), surname: $('r_last').value.trim(), phone: $('r_phone').value.trim(),
+                 branchId: Number($('r_branch').value) || null, password: $('r_pw').value };
+  if (!body.firstName || !body.surname || !body.phone || !body.branchId || !body.password) { err.textContent = 'Please fill in every field and choose your branch.'; return; }
+  if (body.password.length < 6) { err.textContent = 'The password must be at least 6 characters.'; return; }
+  if (body.password !== $('r_pw2').value) { err.textContent = 'The two passwords do not match.'; return; }
+  const r = await fetch('/api/public/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const t = await r.json().catch(() => ({}));
+  if (!r.ok) { err.textContent = t.message || 'Could not create the account. Please check your details.'; return; }
+  ['r_first', 'r_last', 'r_phone', 'r_pw', 'r_pw2'].forEach(i => $(i).value = ''); $('pwMsg').textContent = '';
+  showRegister(false);
+  $('u').value = t.username; $('p').value = ''; $('loginErr').textContent = '';
+  $('regOk').textContent = 'Account created. Sign in with your phone number (' + t.username + ') and the password you chose.';
+}
+
+async function login() {
+  $('loginErr').textContent = '';
+  const typed = $('u').value.trim(), user = /^[+\d][\d\s\-()]*$/.test(typed) ? typed.replace(/[\s\-()]/g, '') : typed;
+  auth = 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + $('p').value)));
+  const r = await api('/api/pumps');
+  if (!r.ok) { $('loginErr').textContent = 'Wrong username or password.'; auth = null; return; }
+  pumps = await r.json();
+  today = (await (await api('/api/today')).json()).today;
+  me = await (await api('/api/me')).json();
+  $('login').classList.add('hidden');
+  $('who').innerHTML = `<span class="meta">${esc(me.name)} · ${dfmt(today)}</span> <button onclick="location.reload()">Log out</button>`;
+  const m = me.role === 'MANAGER' ? await api('/api/manager/stations') : null;
+  if (me.role === 'SUPERVISOR') {
+    startSupervisor();
+  } else if (m && m.ok) {
+    const st = await m.json();
+    $('station').innerHTML = '<option value="">All stations</option>' + st.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    $('date').value = today;
+    $('manager').classList.remove('hidden');
+    $('sumStation').innerHTML = st.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    $('sumDate').value = today;
+    loadSummary(); loadManager(); loadPrices(); loadCurrencies();
+  } else {
+    $('attendant').classList.remove('hidden');
+    await loadMine(); await loadCash();
+    selectPump(pumps[0].id);
+  }
+}
+
+/* ---------- attendant ---------- */
+const money = n => '$' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function showTab(t) {
+  $('entry').classList.toggle('hidden', t !== 'entry'); $('hist').classList.toggle('hidden', t !== 'hist');
+  $('t_entry').classList.toggle('on', t === 'entry'); $('t_hist').classList.toggle('on', t === 'hist');
+  if (t === 'hist') loadHistory();
+}
+const chips = () => $('chips').innerHTML = pumps.map(p => `<button class="chip ${p.id === sel ? 'on' : ''}" onclick="selectPump(${p.id})">${esc(p.name)}</button>`).join('');
+const mineFor = id => mine.find(x => x.pump === pumps.find(p => p.id === id).name && x.date === today);
+
+async function selectPump(id) {
+  sel = id; chips(); $('msg').textContent = '';
+  ctx = await (await api('/api/readings/context?pumpId=' + id)).json();
+  const ex = mineFor(id), setup = ctx.needsSetup;
+  $('aname').textContent = me.name; $('adate').textContent = dfmt(today);
+  $('setupBox').classList.toggle('hidden', !setup);
+  F.forEach(f => { $('c_' + f).value = ex ? ex.closing[f] : ''; });
+  $('astation').textContent = me.station;
+  $('priceLine').innerHTML = `${esc(cap(ctx.fuelType.toLowerCase()))} at <b>${money(ctx.pricePerLitre)}</b> per litre`;
+  $('expBox').classList.toggle('hidden', !ctx.lunchAllowed || setup);
+  $('transWrap').classList.toggle('hidden', !ctx.transportAllowed);
+  $('lunch').value = ex && ex.lunchAmount ? ex.lunchAmount : ''; $('transport').value = ex && ex.transportAmount ? ex.transportAmount : '';
+  $('prevLabel').innerHTML = setup ? '<b>Opening (previous day)</b>' : `Previous closing<br><small>${dfmt(ctx.openingDate)}</small>`;
+  F.forEach(f => { $('p_' + f).innerHTML = setup
+    ? `<input id="o_${f}" type="number" inputmode="decimal" step="0.01" min="0" oninput="live()">`
+    : (f === 'sales' ? money(ctx.opening[f]) : fmt(ctx.opening[f])); });
+  if (setup) {
+    $('sdate').value = ctx.suggestedSetupDate; $('sdate').max = ctx.suggestedSetupDate;
+    $('info').innerHTML = 'First-time setup: enter the <b>previous day’s opening and closing</b> readings once. After this, each opening is taken automatically from the previous closing.';
+  } else {
+    $('info').innerHTML = ex ? '<b>You already submitted today. Saving will update that entry.</b>' : 'Opening readings come automatically from the previous closing.';
+  }
+  renderFills(); live();
+}
+
+const openingOf = f => ctx.needsSetup ? parseFloat($('o_' + f).value) : ctx.opening[f];
+
+function live() {
+  warned = false; $('warn').classList.add('hidden');
+  if (!ctx) return;
+  $('go').textContent = ctx.needsSetup ? 'Save setup readings' : 'Submit closing readings';
+  F.forEach(f => {
+    const c = parseFloat($('c_' + f).value), o = openingOf(f), el = $('d_' + f);
+    if (isNaN(c) || isNaN(o)) { el.textContent = '-'; el.className = ''; return; }
+    const d = c - o; el.textContent = f === 'sales' ? money(d) : fmt(d); el.className = d < 0 ? 'neg' : '';
+  });
+  const price = Number(ctx.pricePerLitre), dv = parseFloat($('c_volume').value) - openingOf('volume'),
+        ds = parseFloat($('c_sales').value) - openingOf('sales'), chk = $('check');
+  if (!isNaN(dv) && !isNaN(price) && price > 0) {
+    const exp = dv * price, off = !isNaN(ds) && Math.abs(exp - ds) > 1;
+    chk.textContent = `Litres × price = ${money(exp)}` + (off ? ` - differs from the sales difference (${money(ds)}). Please check the readings.` : '');
+    chk.className = 'hint' + (off ? ' neg' : '');
+  } else chk.textContent = '';
+}
+
+async function submitReading() {
+  const c = {}, o = {}; let bad = false;
+  F.forEach(f => { c[f] = parseFloat($('c_' + f).value); o[f] = openingOf(f); if (isNaN(c[f]) || c[f] < 0 || isNaN(o[f]) || o[f] < 0) bad = true; });
+  if (ctx.needsSetup && !$('sdate').value) bad = true;
+  $('msg').className = 'err';
+  if (bad) { $('msg').textContent = 'Please fill in every reading (and the date) with valid numbers.'; return; }
+  const low = F.filter(f => c[f] < o[f]);
+  if (low.length && !warned) {
+    warned = true;
+    $('warn').innerHTML = `The ${low.join(', ')} closing reading is lower than the previous one. Check the meter. If it is correct (for example the meter was reset), press Submit anyway.`;
+    $('warn').classList.remove('hidden'); $('go').textContent = 'Submit anyway';
+    return;
+  }
+  const body = { pumpId: sel, date: ctx.needsSetup ? $('sdate').value : null,
+    lunchAmount: ctx.lunchAllowed ? (parseFloat($('lunch').value) || 0) : null,
+    transportAmount: ctx.transportAllowed ? (parseFloat($('transport').value) || 0) : null };
+  F.forEach(f => { body['closing' + cap(f)] = c[f]; body['opening' + cap(f)] = ctx.needsSetup ? o[f] : null; });
+  const wasSetup = ctx.needsSetup;
+  const r = await api('/api/readings', { method: 'POST', body: JSON.stringify(body) });
+  if (!r.ok) { const t = await r.json().catch(() => ({})); $('msg').textContent = t.message || 'Could not save. Please try again.'; return; }
+  await loadMine(); await selectPump(sel);
+  $('msg').className = 'ok';
+  $('msg').textContent = wasSetup ? 'Setup saved. Now enter today’s closing readings for this pump.' : 'Saved. You can now add company car / creditor fills below.';
+}
+
+async function loadMine() {
+  mine = await (await api('/api/readings/mine')).json();
+  if (ctx) renderFills();
+}
+
+function updateFillPreview() {
+  const ex = mineFor(sel), l = parseFloat($('flit').value);
+  $('famt').textContent = money(ex && !isNaN(l) ? l * ex.pricePerLitre : 0);
+}
+
+function renderFills() {
+  const ex = mineFor(sel);
+  $('fillsCard').classList.toggle('hidden', ctx.needsSetup);
+  $('fillNote').classList.toggle('hidden', !!ex);
+  $('fillForm').classList.toggle('hidden', !ex);
+  $('fillList').innerHTML = ex && ex.fills.length
+    ? `<table><tr><th class="l">Type</th><th class="l">Company</th><th class="l">Driver</th><th class="l">Reg. no.</th><th>Litres</th><th>Amount</th><th></th></tr>${ex.fills.map(f =>
+        `<tr><td class="l">${f.type === 'COMPANY' ? 'Company car' : 'Creditor'}</td><td class="l">${esc(f.companyName)}</td><td class="l">${esc(f.driverName)}</td><td class="l">${esc(f.vehicleReg)}</td><td>${fmt(f.litres)}</td><td>${money(f.amount)}</td><td><button class="x" onclick="delFill(${f.id})">Remove</button></td></tr>`).join('')}</table>` : '';
+  $('cashCard').innerHTML = ex ? `<h2>${esc(ex.pump)}: cash for ${dfmt(ex.date)}</h2>
+    <div><span>Sales (closing minus previous)</span><b>${money(ex.difference.sales)}</b></div>
+    <div><span>Less: company cars and creditors</span><b>-${money(ex.creditTotal)}</b></div>
+    <div class="total"><span>Total cash</span><b>${money(ex.cashTotal)}</b></div>` : '';
+  const day = mine.filter(x => x.date === today);
+  $('dayTotal').innerHTML = day.length ? `<h2>My total cash today</h2>${day.map(x => `<div><span>${esc(x.pump)}</span><b>${money(x.cashTotal)}</b></div>`).join('')}
+    <div class="total"><span>Total cash (all pumps)</span><b>${money(day.reduce((a, x) => a + Number(x.cashTotal), 0))}</b></div>` : '';
+  updateFillPreview(); renderCash();
+}
+
+let cashSheet = null;
+const fmt4 = n => Number(n).toLocaleString(undefined, { maximumFractionDigits: 4 });
+async function loadCash() { cashSheet = await (await api('/api/readings/cash')).json(); renderCash(); }
+
+function renderCash() {
+  if (!cashSheet) return;
+  const day = mine.filter(x => x.date === today);
+  if (!day.length) { $('cashDecl').innerHTML = ''; return; }
+  const cur = {}; cashSheet.accepted.forEach(c => { const el = $('cash_' + c.code); if (el) cur[c.code] = el.value; });
+  const have = Object.fromEntries(cashSheet.lines.map(l => [l.currency, l.amount]));
+  $('cashDecl').innerHTML = `<h2>Cash I am handing in</h2>
+    <p class="meta">Enter the amount you hold in each currency your branch accepts. Leave blank if you have none. Exchange rates are set by the manager.</p>
+    <div class="scroll"><table><tr><th class="l">Currency</th><th>Rate (per $1)</th><th>Amount</th><th>US$ value</th></tr>
+    ${cashSheet.accepted.map(c => `<tr><td class="l"><b>${esc(c.code)}</b><small>${esc(c.name)}</small></td><td>${c.code === 'USD' ? '-' : fmt4(c.unitsPerUsd)}</td>
+      <td><input id="cash_${c.code}" type="number" step="0.01" min="0" inputmode="decimal" value="${cur[c.code] ?? have[c.code] ?? ''}" oninput="cashLive()" style="width:130px"></td>
+      <td id="cashv_${c.code}">-</td></tr>`).join('')}</table></div>
+    <div class="cashbox"><div><span>Total cash expected</span><b>${money(day.reduce((a, x) => a + Number(x.cashTotal), 0))}</b></div>
+      <div><span>Handed in (US$ equivalent)</span><b id="cashTot">-</b></div>
+      <div class="total"><span>Difference</span><b id="cashDiff">-</b></div></div>
+    <button class="wide" onclick="saveCash()">Save cash</button><div id="cmsg"></div>`;
+  cashLive();
+}
+
+function cashLive() {
+  const expected = mine.filter(x => x.date === today).reduce((a, x) => a + Number(x.cashTotal), 0);
+  let tot = 0;
+  cashSheet.accepted.forEach(c => {
+    const v = parseFloat($('cash_' + c.code).value) || 0, usd = v / Number(c.unitsPerUsd);
+    tot += usd; $('cashv_' + c.code).textContent = v ? money(usd) : '-';
+  });
+  const diff = tot - expected;
+  $('cashTot').textContent = money(tot);
+  $('cashDiff').textContent = (diff > 0 ? '+' : '') + money(diff);
+  $('cashDiff').className = Math.abs(diff) > 0.005 ? 'neg' : '';
+}
+
+async function saveCash() {
+  const lines = cashSheet.accepted.map(c => ({ currency: c.code, amount: parseFloat($('cash_' + c.code).value) || 0 }));
+  const r = await api('/api/readings/cash', { method: 'POST', body: JSON.stringify({ lines }) });
+  if (r.ok) { cashSheet = await r.json(); $('cmsg').className = 'ok'; $('cmsg').textContent = 'Cash saved.'; }
+  else { $('cmsg').className = 'err'; $('cmsg').textContent = 'Could not save the cash.'; }
+}
+
+async function addFill() {
+  const body = { pumpId: sel, type: $('ftype').value, companyName: $('fcomp').value.trim(), driverName: $('fdriver').value.trim(), vehicleReg: $('freg').value.trim(), litres: parseFloat($('flit').value) };
+  if (!body.driverName || !body.vehicleReg || !(body.litres > 0)) { $('fmsg').textContent = 'Enter the driver’s name, registration number and litres.'; return; }
+  const r = await api('/api/readings/fills', { method: 'POST', body: JSON.stringify(body) });
+  if (!r.ok) { const t = await r.json().catch(() => ({})); $('fmsg').textContent = t.message || 'Could not save this entry.'; return; }
+  $('fmsg').textContent = ''; ['fcomp', 'fdriver', 'freg', 'flit'].forEach(i => $(i).value = '');
+  await loadMine();
+}
+
+async function delFill(id) {
+  if (!confirm('Remove this entry?')) return;
+  await api('/api/readings/fills/' + id, { method: 'DELETE' });
+  await loadMine();
+}
+
+async function loadHistory() {
+  $('histBody').innerHTML = 'Loading...';
+  const days = [...Array(7)].map((_, i) => { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - i); return d.toLocaleDateString('en-CA'); });
+  const all = (await Promise.all(days.map(d => api('/api/readings/mine?date=' + d).then(r => r.json())))).flat();
+  $('histBody').innerHTML = all.length
+    ? `<table><tr><th class="l">Date / pump</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>${all.map(x =>
+        `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>${esc(x.pump)} · $${fmt(x.pricePerLitre)}/L</small></td>${cells(x)}<td>${money(x.creditTotal)}</td><td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>`
+    : '<span class="meta">No readings in the last 7 days.</span>';
+}
+
+/* ---------- manager ---------- */
+async function loadManager() {
+  const q = new URLSearchParams();
+  if ($('station').value) q.set('stationId', $('station').value);
+  if ($('date').value) q.set('date', $('date').value);
+  rows = await (await api('/api/manager/readings?' + q)).json();
+  const sumD = (l, f) => l.reduce((a, x) => a + x.difference[f], 0), sumK = (l, k) => l.reduce((a, x) => a + Number(x[k]), 0);
+  const flagged = rows.filter(x => F.some(f => x.difference[f] < 0)).length;
+  const grp = k => { const g = {}; rows.forEach(x => (g[x[k]] = g[x[k]] || []).push(x)); return Object.entries(g); };
+  const tot = l => `<td>${fmt(sumD(l, 'volume'))}</td><td>${money(sumD(l, 'sales'))}</td><td>${money(sumK(l, 'creditTotal'))}</td><td><b>${money(sumK(l, 'cashTotal'))}</b></td>`;
+  const table = (title, key) => `<div class="card scroll"><h2>${title} - ${dfmt($('date').value)}</h2>
+    <table><tr><th class="l">${key === 'station' ? 'Station' : 'Attendant'}</th><th>Pumps</th><th>Litres</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>
+    ${grp(key).map(([n, l]) => `<tr><td class="l">${esc(n)}</td><td>${l.length}</td>${tot(l)}</tr>`).join('')}</table></div>`;
+  const max = Math.max(1, ...rows.map(x => x.difference.sales));
+
+  $('mgr').innerHTML = !rows.length ? `<div class="card meta">No readings for ${dfmt($('date').value)}.</div>` : `
+    <div class="tiles">
+      <div class="tile"><span class="meta">Pumps reported</span><b>${rows.length}</b></div>
+      <div class="tile"><span class="meta">Litres dispensed</span><b>${fmt(sumD(rows, 'volume'))}</b></div>
+      <div class="tile"><span class="meta">Sales</span><b>${money(sumD(rows, 'sales'))}</b></div>
+      <div class="tile"><span class="meta">Company cars + creditors</span><b>${money(sumK(rows, 'creditTotal'))}</b></div>
+      <div class="tile"><span class="meta">Total cash</span><b>${money(sumK(rows, 'cashTotal'))}</b></div>
+      <div class="tile" style="border-left-color:${flagged ? 'var(--bad)' : 'var(--good)'}"><span class="meta">Need attention</span><b class="${flagged ? 'neg' : ''}">${flagged}</b></div>
+    </div>
+    ${table('Station totals', 'station')}${table('Cash by attendant', 'attendant')}
+    <div class="card"><h2>Sales by pump</h2>
+      ${rows.map(x => { const d = x.difference.sales;
+        return `<div class="bar"><span>${esc(x.pump)}<i>${esc(x.station)}</i></span><div class="track"><div class="fill ${d < 0 ? 'neg' : ''}" style="width:${Math.max(0, d) / max * 100}%"></div></div><b class="${d < 0 ? 'neg' : ''}">${money(d)}</b></div>`; }).join('')}</div>
+    <div class="card scroll"><h2>All readings</h2>
+      <table><tr><th class="l">Date</th><th class="l">Station / pump</th><th class="l">Attendant</th><th>Price/L</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>
+      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>opening from ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${cells(x)}<td>${money(x.creditTotal)}${x.fills.map(f => `<small>${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td><td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
+      <p class="meta">Cash = sales difference minus company-car and creditor fills. Red = lower than the previous reading.</p></div>`;
+}
+
+/* ---------- supervisor ---------- */
+function startSupervisor() {
+  $('supervisor').classList.remove('hidden');
+  $('supTitle').textContent = me.station;
+  $('pgDate').value = today; $('stDate').value = today; $('stDate').max = today; $('supSumDate').value = today;
+  loadPages(); loadStock(); loadSupSummary();
+}
+function showSTab(t) {
+  ['pages', 'stock', 'sum'].forEach(k => { $('s_' + k).classList.toggle('hidden', k !== t); $('sbt_' + k).classList.toggle('on', k === t); });
+}
+
+const rblock = x => `<div style="margin:16px 0"><b>${esc(x.pump)}</b>${badge(x)} <span class="meta">at ${money(x.pricePerLitre)} per litre</span>
+  <div class="scroll"><table class="sheetT"><tr><th class="l"></th><th>Manual</th><th>Volume (L)</th><th>Sales ($)</th></tr>
+    <tr><td class="l">Closing</td><td>${fmt(x.closing.manual)}</td><td>${fmt(x.closing.volume)}</td><td>${money(x.closing.sales)}</td></tr>
+    <tr><td class="l">Previous closing<br><small>${dfmt(x.openingDate)}</small></td><td>${fmt(x.opening.manual)}</td><td>${fmt(x.opening.volume)}</td><td>${money(x.opening.sales)}</td></tr>
+    <tr class="diff"><td class="l">Difference</td><td>${fmt(x.difference.manual)}</td><td>${fmt(x.difference.volume)}</td><td>${money(x.difference.sales)}</td></tr></table></div>
+  ${x.fills.length ? `<div class="scroll"><table style="margin-top:8px"><tr><th class="l">Type</th><th class="l">Company</th><th class="l">Driver</th><th class="l">Reg. no.</th><th>Litres</th><th>Amount</th></tr>
+    ${x.fills.map(f => `<tr><td class="l">${f.type === 'COMPANY' ? 'Company car' : 'Creditor'}</td><td class="l">${esc(f.companyName)}</td><td class="l">${esc(f.driverName)}</td><td class="l">${esc(f.vehicleReg)}</td><td>${fmt(f.litres)}</td><td>${money(f.amount)}</td></tr>`).join('')}</table></div>` : ''}
+  <div class="cashbox" style="margin-top:8px"><div><span>Sales</span><b>${money(x.difference.sales)}</b></div>
+    <div><span>Less: company cars and creditors</span><b>-${money(x.creditTotal)}</b></div>
+    <div class="total"><span>Total cash</span><b>${money(x.cashTotal)}</b></div>
+    ${x.lunchAmount > 0 || x.transportAmount > 0 ? `<div><span>Lunch ${money(x.lunchAmount)} · Transport ${money(x.transportAmount)}</span><b></b></div>` : ''}</div></div>`;
+
+async function loadPages() {
+  const d = $('pgDate').value;
+  const list = await (await api('/api/supervisor/pages' + (d ? '?date=' + d : ''))).json();
+  $('pagesBody').innerHTML = !list.length ? '<div class="card meta">No attendant pages for this date.</div>' : list.map(p => {
+    const df = p.declaredUsd - p.expectedUsd;
+    return `<div class="card"><h2>${esc(p.attendant)}</h2><p class="meta">${dfmt(d || today)} · view only</p>
+      ${p.readings.map(rblock).join('') || '<span class="meta">No pump readings.</span>'}
+      <h3>Cash handed in</h3>
+      ${p.cash.length ? `<table><tr><th class="l">Currency</th><th>Amount</th><th>US$ value</th></tr>${p.cash.map(c => `<tr><td class="l">${esc(c.currency)}</td><td>${fmt(c.amount)}</td><td>${money(c.usdValue)}</td></tr>`).join('')}</table>` : '<span class="meta">Not entered yet.</span>'}
+      <div class="cashbox" style="margin-top:8px"><div><span>Expected cash</span><b>${money(p.expectedUsd)}</b></div><div><span>Handed in (US$)</span><b>${money(p.declaredUsd)}</b></div>
+        <div class="total"><span>Difference</span><b class="${Math.abs(df) > 0.005 ? 'neg' : ''}">${(df > 0 ? '+' : '') + money(df)}</b></div></div></div>`;
+  }).join('');
+}
+
+let stockLines = [];
+const stockInp = (t, k, v) => `<input id="st_${t}_${k}" type="number" step="0.01" min="0" inputmode="decimal" value="${v ?? ''}" oninput="stockLive('${t}')" style="width:150px">`;
+
+async function loadStock() {
+  const d = $('stDate').value;
+  stockLines = await (await api('/api/supervisor/stock' + (d ? '?date=' + d : ''))).json();
+  $('stockBody').innerHTML = stockLines.map(s => {
+    const t = s.fuelType, name = esc(cap(t.toLowerCase()));
+    if (s.beforeStart) return `<div class="card"><h2>Stock: ${name}</h2><p class="meta">Stock records for ${name} start on ${dfmt(s.baselineDate)}. Choose that date or a later one.</p></div>`;
+    if (s.needsSetup || s.baselineDay) return `<div class="card"><h2>Stock: ${name}${s.baselineDay ? ' <span class="badge">First day</span>' : ''}</h2>
+      <div class="info">${s.needsSetup
+        ? `First day of stock records for ${name}: enter the opening and closing stock for <b>${dfmt(d || today)}</b>. From the next day the opening is taken automatically from the previous day’s closing, and the closing is calculated for you.`
+        : 'This is the first day of stock records. You can correct the opening and closing stock here.'}</div>
+      <div class="scroll"><table class="sheetT">
+        <tr><td class="l">Opening stock (L)</td><td>${stockInp(t, 'open', s.opening)}</td></tr>
+        <tr><td class="l">Closing stock (L)</td><td>${stockInp(t, 'close', s.closing)}</td></tr></table></div>
+      <button class="wide" onclick="saveStock('${t}')">${s.needsSetup ? 'Save first-day stock' : 'Update first-day stock'}</button><div id="stmsg_${t}"></div></div>`;
+    return `<div class="card"><h2>Stock: ${name}</h2>
+      <div class="scroll"><table class="sheetT">
+        <tr><td class="l">Opening<br><small>previous day’s closing</small></td><td>${fmt(s.opening)} L</td></tr>
+        <tr><td class="l">Add deliveries</td><td>${stockInp(t, 'del', Number(s.deliveries) || '')}</td></tr>
+        <tr><td class="l">Add returns<br><small>fuel returned to the tank</small></td><td>${stockInp(t, 'ret', Number(s.returns) || '')}</td></tr>
+        <tr><td class="l">Less: litres sold by all ${name.toLowerCase()} pumps</td><td>${fmt(s.salesLitres)} L</td></tr>
+        <tr class="diff"><td class="l">= Closing stock</td><td id="st_${t}_calc">${fmt(s.closing)} L</td></tr></table></div>
+      <button class="wide" onclick="saveStock('${t}')">Save deliveries and returns</button><div id="stmsg_${t}"></div>
+      <p class="meta">The closing stock updates by itself as attendants’ readings come in.</p></div>`;
+  }).join('');
+}
+
+function stockLive(t) {
+  const s = stockLines.find(x => x.fuelType === t), calc = $(`st_${t}_calc`);
+  if (!calc) return;
+  const v = k => parseFloat($(`st_${t}_${k}`).value) || 0;
+  const c = Number(s.opening) + v('del') + v('ret') - Number(s.salesLitres);
+  calc.textContent = fmt(c) + ' L'; calc.className = c < 0 ? 'neg' : '';
+}
+
+async function saveStock(t) {
+  const s = stockLines.find(x => x.fuelType === t), v = k => parseFloat($(`st_${t}_${k}`).value), msg = $('stmsg_' + t);
+  const first = s.needsSetup || s.baselineDay;
+  if (first && (isNaN(v('open')) || isNaN(v('close')))) { msg.className = 'err'; msg.textContent = 'Enter the opening and closing stock.'; return; }
+  const body = { fuelType: t, date: $('stDate').value || null };
+  if (first) { body.opening = v('open'); body.closing = v('close'); } else { body.deliveries = v('del') || 0; body.returns = v('ret') || 0; }
+  const r = await api('/api/supervisor/stock', { method: 'POST', body: JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); msg.className = 'err'; msg.textContent = e.message || 'Could not save.'; return; }
+  await loadStock();
+  $('stmsg_' + t).className = 'ok'; $('stmsg_' + t).textContent = 'Stock saved.';
+}
+
+function showMTab(t) {
+  ['sum', 'read', 'set'].forEach(k => { $('m_' + k).classList.toggle('hidden', k !== t); $('mt_' + k).classList.toggle('on', k === t); });
+}
+
+async function loadSummary() {
+  const d = $('sumDate').value;
+  const r = await api(`/api/manager/summary?stationId=${$('sumStation').value}` + (d ? '&date=' + d : ''));
+  if (!r.ok) { $('summary').innerHTML = '<div class="card err">Could not load the summary.</div>'; return; }
+  renderSummary(await r.json(), 'summary');
+}
+
+async function loadSupSummary() {
+  const d = $('supSumDate').value;
+  const r = await api('/api/supervisor/summary' + (d ? '?date=' + d : ''));
+  if (!r.ok) { $('supSummary').innerHTML = '<div class="card err">Could not load the summary.</div>'; return; }
+  renderSummary(await r.json(), 'supSummary');
+}
+
+function renderSummary(s, target) {
+  const amt = (code, v) => v ? (code === 'USD' ? money(v) : esc(code) + ' ' + fmt(v)) : '—';
+  const cashRows = s.cash.map(c => `<tr><td class="l"><b>${esc(c.code)}</b><small>${esc(c.name)}</small></td><td>${amt(c.code, c.amount)}</td>
+    <td class="l">${c.code !== 'USD' && c.amount ? '≈ ' + money(c.usdValue) + ' <small>at ' + fmt4(c.rate) + ' per $1</small>' : ''}</td></tr>`).join('');
+  const fuelName = x => esc(cap(x.fuelType.toLowerCase()));
+  const stockCard = `<div class="card scroll"><h2>Stock</h2>
+    <table><tr><th class="l">Fuel</th><th>Opening</th><th>Deliveries</th><th>Returns</th><th>Sales</th><th>Closing stock</th></tr>
+    ${s.stock.map(x => x.needsSetup || x.beforeStart
+      ? `<tr><td class="l"><b>${fuelName(x)}</b></td><td colspan="5" class="meta" style="text-align:left">${x.beforeStart ? 'Before the first stock day (' + dfmt(x.baselineDate) + ')' : 'Not entered by the supervisor yet'}</td></tr>`
+      : `<tr><td class="l"><b>${fuelName(x)}</b>${x.baselineDay ? ' <span class="badge">First day</span>' : ''}</td><td>${fmt(x.opening)}</td><td>${fmt(x.deliveries)}</td><td>${fmt(x.returns)}</td><td>${x.baselineDay ? '-' : fmt(x.salesLitres)}</td><td><b class="${x.closing < 0 ? 'neg' : ''}">${fmt(x.closing)}</b></td></tr>`).join('')}</table>
+    <p class="meta">Closing = opening + deliveries + returns − litres sold by all pumps of that fuel. Opening = the previous day’s closing. Litres in L.</p></div>`;
+  const credits = s.credits.map(c => `<tr class="sub"><td class="l">&nbsp;&nbsp;↳ ${esc(c.name)}</td><td>${money(c.amount)}</td><td></td></tr>`).join('');
+  $(target).innerHTML = `
+    <div class="card scroll"><h2>${esc(s.station)}: ${dfmt(s.date)}</h2>
+      <p class="meta">${s.pumpsReported} pump reading(s) from ${s.attendants.length} attendant(s)</p>
+      <table class="sumT"><tr><th class="l">Total</th><th>Amount</th><th class="l"></th></tr>
+        ${cashRows}
+        <tr class="diff"><td class="l">Total cash (US$ equivalent)</td><td>${money(s.declaredUsd)}</td><td></td></tr>
+        <tr><td class="l"><b>Expenses</b></td><td><b>${money(s.expensesTotal)}</b></td>
+          <td class="l"><small>Company cars ${money(s.companyFuel)} · Lunch ${money(s.lunch)} · Transport ${money(s.transport)}</small></td></tr>
+        <tr><td class="l"><b>Credit</b></td><td><b>${money(s.creditTotal)}</b></td><td></td></tr>
+        ${credits || '<tr class="sub"><td class="l">&nbsp;&nbsp;No credit</td><td></td><td></td></tr>'}
+      </table></div>
+    <div class="card scroll"><table class="sumT"><tr><th class="l">Total sales and expense litres</th><th>Litres</th></tr>
+      ${s.litres.map(x => `<tr><td class="l">${esc(cap(x.fuelType.toLowerCase()))}</td><td><b>${fmt(x.litres)} L</b></td></tr>`).join('') || '<tr class="sub"><td class="l">No readings</td><td></td></tr>'}</table></div>
+    ${stockCard}
+    <div class="card scroll"><h2>Cash check by attendant</h2>
+      <table><tr><th class="l">Attendant</th><th>Expected cash</th><th>Handed in (US$)</th><th>Difference</th></tr>
+      ${s.attendants.map(a => { const df = a.declaredUsd - a.expectedUsd;
+        return `<tr><td class="l">${esc(a.attendant)}</td><td>${money(a.expectedUsd)}</td><td>${money(a.declaredUsd)}</td><td class="${Math.abs(df) > 0.005 ? 'neg' : ''}"><b>${(df > 0 ? '+' : '') + money(df)}</b></td></tr>`; }).join('')}
+      <tr class="diff"><td class="l">Total (sales ${money(s.salesUsd)})</td><td>${money(s.expectedCashUsd)}</td><td>${money(s.declaredUsd)}</td><td></td></tr></table>
+      <p class="meta">Expected cash = pump sales minus company-car and creditor fuel. Handed in = what attendants declared, converted at the exchange rate saved with it.</p></div>`;
+}
+
+let currencyList = [], stationList = [];
+async function loadCurrencies() {
+  currencyList = await (await api('/api/manager/currencies')).json();
+  stationList = await (await api('/api/manager/stations')).json();
+  $('currencies').innerHTML = `<h2>Currencies and exchange rates</h2>
+    <p class="meta">Rate = units of the currency per US$1 (18 means $1 = 18 rand). Attendants only see the currencies their branch accepts.</p>
+    <div class="scroll"><table><tr><th class="l">Currency</th><th>Rate (per $1)</th><th>New rate</th><th></th></tr>
+    ${currencyList.map(c => `<tr><td class="l"><b>${esc(c.code)}</b><small>${esc(c.name)}</small></td><td>${c.code === 'USD' ? '1 (base)' : fmt4(c.unitsPerUsd)}</td>
+      <td>${c.code === 'USD' ? '' : `<input id="rate_${c.code}" type="number" step="0.0001" min="0" inputmode="decimal" style="width:120px">`}</td>
+      <td>${c.code === 'USD' ? '' : `<button onclick="saveRate('${c.code}')">Update</button>`}</td></tr>`).join('')}</table></div>
+    <h3>Add a currency</h3>
+    <div class="row"><div><label>Code (e.g. BWP)</label><input id="nc_code" maxlength="5"></div><div><label>Name</label><input id="nc_name"></div>
+      <div><label>Rate per $1</label><input id="nc_rate" type="number" step="0.0001" min="0"></div><div style="flex:0"><button onclick="addCurrency()">Add</button></div></div>
+    <h3>Currencies accepted at each branch</h3>
+    <div class="scroll"><table><tr><th class="l">Branch</th>${currencyList.map(c => `<th>${esc(c.code)}</th>`).join('')}</tr>
+    ${stationList.map(s => `<tr><td class="l">${esc(s.name)}</td>${currencyList.map(c => `<td><input type="checkbox" data-st="${s.id}" data-cur="${c.code}" ${s.currencies.includes(c.code) ? 'checked' : ''} ${c.code === 'USD' ? 'disabled' : ''} onchange="toggleAccept(${s.id})" style="width:auto"></td>`).join('')}</tr>`).join('')}</table></div>
+    <div id="cumsg"></div>`;
+}
+
+async function postCurrency(body, ok) {
+  const r = await api('/api/manager/currencies', { method: 'POST', body: JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); $('cumsg').className = 'err'; $('cumsg').textContent = e.message || 'Could not save.'; return; }
+  await loadCurrencies(); $('cumsg').className = 'ok'; $('cumsg').textContent = ok;
+}
+function saveRate(code) {
+  const v = parseFloat($('rate_' + code).value);
+  if (!(v > 0)) { $('cumsg').className = 'err'; $('cumsg').textContent = 'Enter the new rate.'; return; }
+  postCurrency({ code, name: currencyList.find(c => c.code === code).name, unitsPerUsd: v }, code + ' rate updated.');
+}
+function addCurrency() {
+  const code = $('nc_code').value.trim(), name = $('nc_name').value.trim(), v = parseFloat($('nc_rate').value);
+  if (!code || !name || !(v > 0)) { $('cumsg').className = 'err'; $('cumsg').textContent = 'Enter the code, name and rate.'; return; }
+  postCurrency({ code, name, unitsPerUsd: v }, code.toUpperCase() + ' added.');
+}
+async function toggleAccept(id) {
+  const codes = [...document.querySelectorAll(`input[data-st="${id}"]`)].filter(i => i.checked).map(i => i.dataset.cur);
+  const r = await api(`/api/manager/stations/${id}/currencies`, { method: 'POST', body: JSON.stringify({ currencies: codes }) });
+  $('cumsg').className = r.ok ? 'ok' : 'err'; $('cumsg').textContent = r.ok ? 'Branch currencies saved.' : 'Could not save.';
+}
+
+async function loadPrices() {
+  const list = await (await api('/api/manager/prices')).json();
+  $('prices').innerHTML = `<h2>Fuel prices per litre</h2>
+    <p class="meta">A price stays in force every day until you change it. Attendants see it automatically.</p>
+    <div class="scroll"><table><tr><th class="l">Fuel</th><th>Current price</th><th>In force since</th><th>New price ($)</th><th>From date</th><th></th></tr>
+    ${list.map(p => `<tr><td class="l"><b>${esc(cap(p.fuelType.toLowerCase()))}</b>${p.nextPrice != null ? `<small>Scheduled: ${money(p.nextPrice)} from ${dfmt(p.nextDate)}</small>` : ''}</td>
+      <td><b>${money(p.pricePerLitre)}</b></td><td>${dfmt(p.since)}</td>
+      <td><input id="np_${p.fuelType}" type="number" step="0.01" min="0" inputmode="decimal" style="width:110px"></td>
+      <td><input id="nd_${p.fuelType}" type="date" min="${today}" value="${today}" style="width:160px"></td>
+      <td><button onclick="setPrice('${p.fuelType}')">Update</button></td></tr>`).join('')}</table></div><div id="pmsg"></div>`;
+}
+
+async function setPrice(t) {
+  const v = parseFloat($('np_' + t).value), d = $('nd_' + t).value;
+  $('pmsg').className = 'err';
+  if (!(v > 0)) { $('pmsg').textContent = 'Enter the new price per litre.'; return; }
+  const r = await api('/api/manager/prices', { method: 'POST', body: JSON.stringify({ fuelType: t, pricePerLitre: v, effectiveDate: d || null }) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); $('pmsg').textContent = e.message || 'Could not save the price.'; return; }
+  await loadPrices(); await loadManager();
+  $('pmsg').className = 'ok'; $('pmsg').textContent = 'Price updated.';
+}
+
+function exportCsv() {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const hd = ['Date', 'Station', 'Pump', 'Attendant', 'Price per litre', 'First-time setup', 'Opening taken from'];
+  F.forEach(f => hd.push(cap(f) + ' opening', cap(f) + ' closing', cap(f) + ' difference'));
+  hd.push('Credit total', 'Cash total', 'Company cars and creditors');
+  const lines = [hd.map(q).join(',')];
+  rows.forEach(x => {
+    const l = [x.date, x.station, x.pump, x.attendant, x.pricePerLitre, x.firstTimeSetup ? 'yes' : 'no', x.openingDate];
+    F.forEach(f => l.push(x.opening[f], x.closing[f], x.difference[f]));
+    l.push(x.creditTotal, x.cashTotal, x.fills.map(f => `${f.type} ${f.companyName} ${f.vehicleReg} ${f.driverName} ${f.litres}L $${f.amount}`).join('; '));
+    lines.push(l.map(q).join(','));
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  a.download = 'nugget-readings-' + ($('date').value || today) + '.csv';
+  a.click();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && !$('login').classList.contains('hidden')) login(); });
+</script>
+</body>
+</html>
