@@ -573,18 +573,23 @@ const stockInp = (t, k, v) => `<input id="st_${t}_${k}" type="number" step="0.01
 
 async function loadStock() {
   const d = $('stDate').value;
+  const yd = new Date(today + 'T12:00:00'); yd.setDate(yd.getDate() - 1); const yesterday = yd.toLocaleDateString('en-CA');
   stockLines = await (await api('/api/supervisor/stock' + (d ? '?date=' + d : ''))).json();
   $('stockBody').innerHTML = stockLines.map(s => {
     const t = s.fuelType, name = esc(cap(t.toLowerCase()));
     if (s.beforeStart) return `<div class="card"><h2>Stock: ${name}</h2><p class="meta">Stock records for ${name} start on ${dfmt(s.baselineDate)}. Choose that date or a later one.</p></div>`;
-    if (s.needsSetup || s.baselineDay) return `<div class="card"><h2>Stock: ${name}${s.baselineDay ? ' <span class="badge">First day</span>' : ''}</h2>
-      <div class="info">${s.needsSetup
-        ? `First day of stock records for ${name}: enter the opening and closing stock for <b>${dfmt(d || today)}</b>. From the next day the opening is taken automatically from the previous day’s closing, and the closing is calculated for you.`
-        : 'This is the first day of stock records. You can correct the opening and closing stock here.'}</div>
-      <div class="scroll"><table class="sheetT">
-        <tr><td class="l">Opening stock (L)</td><td>${stockInp(t, 'open', s.opening)}</td></tr>
-        <tr><td class="l">Closing stock (L)</td><td>${stockInp(t, 'close', s.closing)}</td></tr></table></div>
-      <button class="wide" onclick="saveStock('${t}')">${s.needsSetup ? 'Save first-day stock' : 'Update first-day stock'}</button><div id="stmsg_${t}"></div></div>`;
+    if (s.needsSetup || s.baselineDay) {
+      const dateRow = s.needsSetup
+        ? `<tr><td class="l">Date of this closing stock<br><small>the previous day</small></td><td><input id="st_${t}_date" type="date" value="${yesterday}" max="${yesterday}" style="width:170px"></td></tr>`
+        : `<tr><td class="l">Date</td><td>${dfmt(s.baselineDate)}</td></tr>`;
+      return `<div class="card"><h2>Stock: ${name}${s.baselineDay ? ' <span class="badge">Starting stock</span>' : ''}</h2>
+        <div class="info">${s.needsSetup
+          ? `First time for ${name}: enter only the <b>closing stock of the previous day</b>. It becomes the opening stock for the next day. After that the closing stock is calculated for you: opening + deliveries + returns − litres sold.`
+          : `This is the starting stock for ${name} (the closing stock of that day). You can correct it here.`}</div>
+        <div class="scroll"><table class="sheetT">${dateRow}
+          <tr><td class="l">Closing stock (L)</td><td>${stockInp(t, 'close', s.closing)}</td></tr></table></div>
+        <button class="wide" onclick="saveStock('${t}')">${s.needsSetup ? 'Save closing stock' : 'Update closing stock'}</button><div id="stmsg_${t}"></div></div>`;
+    }
     return `<div class="card"><h2>Stock: ${name}</h2>
       <div class="scroll"><table class="sheetT">
         <tr><td class="l">Opening<br><small>previous day’s closing</small></td><td>${fmt(s.opening)} L</td></tr>
@@ -608,9 +613,9 @@ function stockLive(t) {
 async function saveStock(t) {
   const s = stockLines.find(x => x.fuelType === t), v = k => parseFloat($(`st_${t}_${k}`).value), msg = $('stmsg_' + t);
   const first = s.needsSetup || s.baselineDay;
-  if (first && (isNaN(v('open')) || isNaN(v('close')))) { msg.className = 'err'; msg.textContent = 'Enter the opening and closing stock.'; return; }
-  const body = { fuelType: t, date: $('stDate').value || null };
-  if (first) { body.opening = v('open'); body.closing = v('close'); } else { body.deliveries = v('del') || 0; body.returns = v('ret') || 0; }
+  if (first && isNaN(v('close'))) { msg.className = 'err'; msg.textContent = 'Enter the closing stock.'; return; }
+  const body = { fuelType: t, date: s.needsSetup ? $(`st_${t}_date`).value : (s.baselineDay ? s.baselineDate : ($('stDate').value || null)) };
+  if (first) { body.closing = v('close'); } else { body.deliveries = v('del') || 0; body.returns = v('ret') || 0; }
   const r = await api('/api/supervisor/stock', { method: 'POST', body: JSON.stringify(body) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); msg.className = 'err'; msg.textContent = e.message || 'Could not save.'; return; }
   await loadStock();
@@ -647,7 +652,7 @@ function renderSummary(s, target) {
     <table><tr><th class="l">Fuel</th><th>Opening</th><th>Deliveries</th><th>Returns</th><th>Sales</th><th>Closing stock</th></tr>
     ${s.stock.map(x => x.needsSetup || x.beforeStart
       ? `<tr><td class="l"><b>${fuelName(x)}</b></td><td colspan="5" class="meta" style="text-align:left">${x.beforeStart ? 'Before the first stock day (' + dfmt(x.baselineDate) + ')' : 'Not entered by the supervisor yet'}</td></tr>`
-      : `<tr><td class="l"><b>${fuelName(x)}</b>${x.baselineDay ? ' <span class="badge">First day</span>' : ''}</td><td>${fmt(x.opening)}</td><td>${fmt(x.deliveries)}</td><td>${fmt(x.returns)}</td><td>${x.baselineDay ? '-' : fmt(x.salesLitres)}</td><td><b class="${x.closing < 0 ? 'neg' : ''}">${fmt(x.closing)}</b></td></tr>`).join('')}</table>
+      : `<tr><td class="l"><b>${fuelName(x)}</b>${x.baselineDay ? ' <span class="badge">Starting stock</span>' : ''}</td><td>${x.baselineDay ? '-' : fmt(x.opening)}</td><td>${x.baselineDay ? '-' : fmt(x.deliveries)}</td><td>${x.baselineDay ? '-' : fmt(x.returns)}</td><td>${x.baselineDay ? '-' : fmt(x.salesLitres)}</td><td><b class="${x.closing < 0 ? 'neg' : ''}">${fmt(x.closing)}</b></td></tr>`).join('')}</table>
     <p class="meta">Closing = opening + deliveries + returns − litres sold by all pumps of that fuel. Opening = the previous day’s closing. Litres in L.</p></div>`;
   const credits = s.credits.map(c => `<tr class="sub"><td class="l">&nbsp;&nbsp;↳ ${esc(c.name)}</td><td>${money(c.amount)}</td><td></td></tr>`).join('');
   $(target).innerHTML = `

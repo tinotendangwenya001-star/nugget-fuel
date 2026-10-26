@@ -420,12 +420,12 @@ public class ReadingService {
 
         var base = stockRepo.findFirstByStationIdAndFuelTypeAndBaselineTrueOrderByStockDateAsc(sid, type);
         if (base.isEmpty() || d.equals(base.get().getStockDate())) {
-            // first day (or correcting it): opening and closing are typed in
-            if (req.opening() == null || req.closing() == null) {
-                throw bad("Enter the opening and closing stock for the first day.");
-            }
+            // first time (or correcting it): only the closing stock of the PREVIOUS day is typed in.
+            // From the next day on, opening = previous closing and closing is calculated.
+            if (req.closing() == null) throw bad("Enter the closing stock.");
+            if (base.isEmpty() && !d.isBefore(today())) throw bad("Enter the closing stock of the previous day.");
             StockEntry e = base.orElseGet(() -> new StockEntry(station, type, d, true));
-            e.setBaseline(req.opening(), req.closing(), username);
+            e.setBaseline(null, req.closing(), username);
             stockRepo.save(e);
         } else if (d.isAfter(base.get().getStockDate())) {
             // later days: only deliveries and returns are typed in
