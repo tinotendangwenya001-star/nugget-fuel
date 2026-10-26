@@ -92,19 +92,23 @@
   <div id="loginErr" class="err"></div>
   <p class="meta">Demo users: alice, bob (attendants), manager. Password: password</p>
   <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-  <p class="meta">New fuel attendant?</p>
+  <p class="meta">New here?</p>
   <button class="ghost wide" style="margin-top:6px" onclick="showRegister(true)">Create an account</button>
 </section>
 
 <section id="register" class="card hidden">
   <h2>Create your account</h2>
-  <p class="meta">Your phone number will be your username.</p>
+  <p class="meta">Your phone number will be your username. One person can have only one account.</p>
+  <label>I am registering as</label>
+  <select id="r_role" onchange="roleChange()"><option value="ATTENDANT">Fuel attendant</option><option value="SUPERVISOR">Supervisor</option><option value="MANAGER">Manager</option></select>
   <div class="row">
     <div><label>First name</label><input id="r_first" autocomplete="given-name"></div>
     <div><label>Surname</label><input id="r_last" autocomplete="family-name"></div>
   </div>
   <label>Phone number</label><input id="r_phone" type="tel" inputmode="tel" placeholder="e.g. 0771234567" autocomplete="tel">
-  <label>Branch you work at</label><select id="r_branch"></select>
+  <div id="r_branchWrap"><label>Branch you work at</label><select id="r_branch"></select></div>
+  <div id="r_codeWrap" class="hidden"><label>Access code (given to you by the company)</label>
+    <div class="pw"><input id="r_code" type="password" autocomplete="off"><button type="button" class="ghost" onclick="togglePw('r_code', this)">Show</button></div></div>
   <label>Create password (at least 6 characters)</label>
   <div class="pw"><input id="r_pw" type="password" autocomplete="new-password" oninput="pwCheck()"><button type="button" class="ghost" onclick="togglePw('r_pw', this)">Show</button></div>
   <label>Confirm password</label>
@@ -264,17 +268,25 @@ function pwCheck() {
   if (a === b) m.textContent = '✓ The passwords match.'; else { m.textContent = 'The passwords do not match.'; m.className = 'hint neg'; }
 }
 
+function roleChange() {
+  const r = $('r_role').value;
+  $('r_branchWrap').classList.toggle('hidden', r === 'MANAGER');   // managers see every branch
+  $('r_codeWrap').classList.toggle('hidden', r === 'ATTENDANT');   // supervisors and managers need the company code
+}
+
 async function register() {
   const err = $('regErr'); err.textContent = '';
   const body = { firstName: $('r_first').value.trim(), surname: $('r_last').value.trim(), phone: $('r_phone').value.trim(),
-                 branchId: Number($('r_branch').value) || null, password: $('r_pw').value };
-  if (!body.firstName || !body.surname || !body.phone || !body.branchId || !body.password) { err.textContent = 'Please fill in every field and choose your branch.'; return; }
+                 role: $('r_role').value,
+                 branchId: $('r_role').value === 'MANAGER' ? null : (Number($('r_branch').value) || null),
+                 accessCode: $('r_role').value === 'ATTENDANT' ? null : $('r_code').value.trim(), password: $('r_pw').value };
+  if (!body.firstName || !body.surname || !body.phone || !body.password || (body.role !== 'MANAGER' && !body.branchId) || (body.role !== 'ATTENDANT' && !body.accessCode)) { err.textContent = 'Please fill in every field' + (body.role === 'MANAGER' ? '.' : ' and choose your branch.'); return; }
   if (body.password.length < 6) { err.textContent = 'The password must be at least 6 characters.'; return; }
   if (body.password !== $('r_pw2').value) { err.textContent = 'The two passwords do not match.'; return; }
   const r = await fetch('/api/public/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const t = await r.json().catch(() => ({}));
   if (!r.ok) { err.textContent = t.message || 'Could not create the account. Please check your details.'; return; }
-  ['r_first', 'r_last', 'r_phone', 'r_pw', 'r_pw2'].forEach(i => $(i).value = ''); $('pwMsg').textContent = '';
+  ['r_first', 'r_last', 'r_phone', 'r_pw', 'r_pw2', 'r_code'].forEach(i => $(i).value = ''); $('pwMsg').textContent = '';
   showRegister(false);
   $('u').value = t.username; $('p').value = ''; $('loginErr').textContent = '';
   $('regOk').textContent = 'Account created. Sign in with your phone number (' + t.username + ') and the password you chose.';
