@@ -180,15 +180,15 @@
     <p class="meta">You can view every attendant’s page at your branch (view only) and record the stock. Only your own branch is shown.</p></div>
   <div class="tabs"><button id="sbt_pages" class="on" onclick="showSTab('pages')">Branch pages</button><button id="sbt_stock" onclick="showSTab('stock')">Stock</button><button id="sbt_sum" onclick="showSTab('sum')">Branch summary</button></div>
   <div id="s_pages">
-    <div class="card"><div class="row"><div><label>Date</label><input id="pgDate" type="date"></div><div style="flex:0"><button onclick="loadPages()">View</button></div></div></div>
+    <div class="card"><div class="row"><div><label>Date</label><input id="pgDate" type="date" onchange="loadPages()"></div><div style="flex:0"><button onclick="loadPages()">View</button></div></div></div>
     <div id="pagesBody"></div>
   </div>
   <div id="s_stock" class="hidden">
-    <div class="card"><div class="row"><div><label>Date</label><input id="stDate" type="date"></div><div style="flex:0"><button onclick="loadStock()">View</button></div></div></div>
+    <div class="card"><div class="row"><div><label>Date</label><input id="stDate" type="date" onchange="loadStock()"></div><div style="flex:0"><button onclick="loadStock()">View</button></div></div></div>
     <div id="stockBody"></div>
   </div>
   <div id="s_sum" class="hidden">
-    <div class="card"><div class="row"><div><label>Date</label><input id="supSumDate" type="date"></div><div style="flex:0"><button onclick="loadSupSummary()">View</button></div></div></div>
+    <div class="card"><div class="row"><div><label>Date</label><input id="supSumDate" type="date" onchange="loadSupSummary()"></div><div style="flex:0"><button onclick="loadSupSummary()">View</button></div></div></div>
     <div id="supSummary"></div>
   </div>
 </section>
@@ -201,16 +201,16 @@
   </div>
   <div id="m_sum">
     <div class="card"><div class="row">
-      <div><label>Branch</label><select id="sumStation"></select></div>
-      <div><label>Date</label><input id="sumDate" type="date"></div>
+      <div><label>Branch</label><select id="sumStation" onchange="loadSummary()"></select></div>
+      <div><label>Date</label><input id="sumDate" type="date" onchange="loadSummary()"></div>
       <div style="flex:0"><button onclick="loadSummary()">View</button></div>
     </div></div>
     <div id="summary"></div>
   </div>
   <div id="m_read" class="hidden">
     <div class="card"><div class="row">
-      <div><label>Station</label><select id="station"></select></div>
-      <div><label>Date</label><input id="date" type="date"></div>
+      <div><label>Station</label><select id="station" onchange="loadManager()"></select></div>
+      <div><label>Date</label><input id="date" type="date" onchange="loadManager()"></div>
       <div style="flex:0"><button onclick="loadManager()">View</button></div>
       <div style="flex:0"><button class="ghost" onclick="exportCsv()">Export CSV</button></div>
     </div></div>
@@ -235,6 +235,10 @@ const api = (path, opts = {}) => fetch(path, { ...opts, headers: { 'Authorizatio
 const badge = x => x.firstTimeSetup ? ' <span class="badge">Setup</span>' : '';
 const cell = (o, c) => { const d = c - o; return `<td class="${d < 0 ? 'neg' : ''}"><b>${sgn(d)}</b><small>${fmt(o)} → ${fmt(c)}</small></td>`; };
 const cells = x => F.map(f => cell(x.opening[f], x.closing[f])).join('');
+const stackCells = x => F.map(f => {
+  const c = x.closing[f], o = x.opening[f], d = c - o;
+  return `<td><div>${fmt(c)}</div><div style="color:var(--muted)">${fmt(o)}</div><div class="${d < 0 ? 'neg' : ''}" style="border-top:1px solid var(--line);font-weight:700">${fmt(d)}</div></td>`;
+}).join('');
 const head = first => `<tr><th class="l">${first}</th><th>Manual</th><th>Volume</th><th>Sales</th></tr>`;
 
 function togglePw(id, btn) {
@@ -511,8 +515,8 @@ async function loadManager() {
         return `<div class="bar"><span>${esc(x.pump)}<i>${esc(x.station)}</i></span><div class="track"><div class="fill ${d < 0 ? 'neg' : ''}" style="width:${Math.max(0, d) / max * 100}%"></div></div><b class="${d < 0 ? 'neg' : ''}">${money(d)}</b></div>`; }).join('')}</div>
     <div class="card scroll"><h2>All readings</h2>
       <table><tr><th class="l">Date</th><th class="l">Station / pump</th><th class="l">Attendant</th><th>Price/L</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>
-      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>opening from ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${cells(x)}<td>${money(x.creditTotal)}${x.fills.map(f => `<small>${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td><td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
-      <p class="meta">Cash = sales difference minus company-car and creditor fills. Red = lower than the previous reading.</p></div>`;
+      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>previous closing: ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${stackCells(x)}<td>${money(x.creditTotal)}${x.fills.map(f => `<small>${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td><td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
+      <p class="meta">In the Manual, Volume and Sales columns: top = closing reading, middle = previous day’s closing (today’s opening), bottom = difference. Cash = sales difference minus company-car and creditor fills. Red = lower than the previous reading.</p></div>`;
 }
 
 /* ---------- supervisor ---------- */
@@ -605,11 +609,14 @@ function showMTab(t) {
   ['sum', 'read', 'set'].forEach(k => { $('m_' + k).classList.toggle('hidden', k !== t); $('mt_' + k).classList.toggle('on', k === t); });
 }
 
+let sumSeq = 0;
 async function loadSummary() {
-  const d = $('sumDate').value;
+  const my = ++sumSeq, d = $('sumDate').value;
+  $('summary').innerHTML = '<div class="card meta">Loading...</div>';
   const r = await api(`/api/manager/summary?stationId=${$('sumStation').value}` + (d ? '&date=' + d : ''));
   if (!r.ok) { $('summary').innerHTML = '<div class="card err">Could not load the summary.</div>'; return; }
-  renderSummary(await r.json(), 'summary');
+  const s = await r.json();
+  if (my === sumSeq) renderSummary(s, 'summary');
 }
 
 async function loadSupSummary() {
