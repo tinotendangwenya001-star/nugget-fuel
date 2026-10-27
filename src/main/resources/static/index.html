@@ -239,6 +239,11 @@ const api = (path, opts = {}) => fetch(path, { ...opts, headers: { 'Authorizatio
 const badge = x => x.firstTimeSetup ? ' <span class="badge">Setup</span>' : '';
 const cell = (o, c) => { const d = c - o; return `<td class="${d < 0 ? 'neg' : ''}"><b>${sgn(d)}</b><small>${fmt(o)} → ${fmt(c)}</small></td>`; };
 const cells = x => F.map(f => cell(x.opening[f], x.closing[f])).join('');
+const sumType = (x, type) => x.fills.filter(f => f.type === type).reduce((a, f) => a + Number(f.amount), 0);
+const fillCell = (x, type) => {
+  const l = x.fills.filter(f => f.type === type);
+  return `<td>${money(sumType(x, type))}${l.map(f => `<small>${type === 'CREDITOR' && f.companyName ? esc(f.companyName) + ' · ' : ''}${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td>`;
+};
 const stackCells = x => F.map(f => {
   const c = x.closing[f], o = x.opening[f], d = c - o;
   return `<td><div>${fmt(c)}</div><div style="color:var(--muted)">${fmt(o)}</div><div class="${d < 0 ? 'neg' : ''}" style="border-top:1px solid var(--line);font-weight:700">${fmt(d)}</div></td>`;
@@ -506,9 +511,9 @@ async function loadManager() {
   const sumD = (l, f) => l.reduce((a, x) => a + x.difference[f], 0), sumK = (l, k) => l.reduce((a, x) => a + Number(x[k]), 0);
   const flagged = rows.filter(x => F.some(f => x.difference[f] < 0)).length;
   const grp = k => { const g = {}; rows.forEach(x => (g[x[k]] = g[x[k]] || []).push(x)); return Object.entries(g); };
-  const tot = l => `<td>${fmt(sumD(l, 'volume'))}</td><td>${money(sumD(l, 'sales'))}</td><td>${money(sumK(l, 'creditTotal'))}</td><td><b>${money(sumK(l, 'cashTotal'))}</b></td>`;
+  const tot = l => `<td>${fmt(sumD(l, 'volume'))}</td><td>${money(sumD(l, 'sales'))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'COMPANY'), 0))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'CREDITOR'), 0))}</td><td><b>${money(sumK(l, 'cashTotal'))}</b></td>`;
   const table = (title, key) => `<div class="card scroll"><h2>${title} - ${dfmt($('date').value)}</h2>
-    <table><tr><th class="l">${key === 'station' ? 'Station' : 'Attendant'}</th><th>Pumps</th><th>Litres</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>
+    <table><tr><th class="l">${key === 'station' ? 'Station' : 'Attendant'}</th><th>Pumps</th><th>Litres</th><th>Sales</th><th>Company cars</th><th>Credit</th><th>Cash</th></tr>
     ${grp(key).map(([n, l]) => `<tr><td class="l">${esc(n)}</td><td>${l.length}</td>${tot(l)}</tr>`).join('')}</table></div>`;
   const max = Math.max(1, ...rows.map(x => x.difference.sales));
 
@@ -526,8 +531,8 @@ async function loadManager() {
       ${rows.map(x => { const d = x.difference.sales;
         return `<div class="bar"><span>${esc(x.pump)}<i>${esc(x.station)}</i></span><div class="track"><div class="fill ${d < 0 ? 'neg' : ''}" style="width:${Math.max(0, d) / max * 100}%"></div></div><b class="${d < 0 ? 'neg' : ''}">${money(d)}</b></div>`; }).join('')}</div>
     <div class="card scroll"><h2>All readings</h2>
-      <table><tr><th class="l">Date</th><th class="l">Station / pump</th><th class="l">Attendant</th><th>Price/L</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>
-      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>previous closing: ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${stackCells(x)}<td>${money(x.creditTotal)}${x.fills.map(f => `<small>${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td><td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
+      <table><tr><th class="l">Date</th><th class="l">Station / pump</th><th class="l">Attendant</th><th>Price/L</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Company cars</th><th>Credit</th><th>Cash</th></tr>
+      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>previous closing: ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${stackCells(x)}${fillCell(x, 'COMPANY')}${fillCell(x, 'CREDITOR')}<td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
       <p class="meta">In the Manual, Volume and Sales columns: top = closing reading, middle = previous day’s closing (today’s opening), bottom = difference. Cash = sales difference minus company-car and creditor fills. Red = lower than the previous reading.</p></div>`;
 }
 
@@ -743,12 +748,12 @@ function exportCsv() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const hd = ['Date', 'Station', 'Pump', 'Attendant', 'Price per litre', 'First-time setup', 'Opening taken from'];
   F.forEach(f => hd.push(cap(f) + ' opening', cap(f) + ' closing', cap(f) + ' difference'));
-  hd.push('Credit total', 'Cash total', 'Company cars and creditors');
+  hd.push('Company cars total', 'Credit total (creditors)', 'Cash total', 'Company cars and creditors');
   const lines = [hd.map(q).join(',')];
   rows.forEach(x => {
     const l = [x.date, x.station, x.pump, x.attendant, x.pricePerLitre, x.firstTimeSetup ? 'yes' : 'no', x.openingDate];
     F.forEach(f => l.push(x.opening[f], x.closing[f], x.difference[f]));
-    l.push(x.creditTotal, x.cashTotal, x.fills.map(f => `${f.type} ${f.companyName} ${f.vehicleReg} ${f.driverName} ${f.litres}L $${f.amount}`).join('; '));
+    l.push(sumType(x, 'COMPANY'), sumType(x, 'CREDITOR'), x.cashTotal, x.fills.map(f => `${f.type} ${f.companyName} ${f.vehicleReg} ${f.driverName} ${f.litres}L $${f.amount}`).join('; '));
     lines.push(l.map(q).join(','));
   });
   const a = document.createElement('a');
