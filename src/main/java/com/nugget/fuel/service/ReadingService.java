@@ -43,6 +43,7 @@ public class ReadingService {
     private final CurrencyRepository currencies;
     private final CashDeclarationRepository cash;
     private final StockRepository stockRepo;
+    private final FuelDiscountRepository discountRepo;
 
     @Value("${nugget.timezone:Africa/Harare}")
     private String timezone;
@@ -50,9 +51,11 @@ public class ReadingService {
     public ReadingService(UserRepository users, PumpRepository pumps, ReadingRepository readings,
                           StationRepository stations, CreditFillRepository fills, FuelPriceRepository priceRepo,
                           CurrencyRepository currencies, CashDeclarationRepository cash,
-                          StockRepository stockRepo) {
+                          StockRepository stockRepo,
+                          FuelDiscountRepository discountRepo) {
         this.users = users; this.pumps = pumps; this.readings = readings; this.stations = stations;
         this.fills = fills; this.priceRepo = priceRepo; this.currencies = currencies; this.cash = cash; this.stockRepo = stockRepo;
+        this.discountRepo = discountRepo;
     }
 
     // ---------- helpers ----------
@@ -95,12 +98,12 @@ public class ReadingService {
         boolean lunch = pump.isLunchPump(), transport = lunch && isMonday();
         var prev = readings.findFirstByPumpAndReadingDateLessThanOrderByReadingDateDesc(pump, today());
         if (!readings.existsByPump(pump) || prev.isEmpty()) {
-            return new PumpContext(true, yesterday, null, null, pump.getFuelType(), price, lunch, transport);
+            return new PumpContext(true, yesterday, null, null, pump.getFuelType(), price, discountOn(pump.getFuelType(), today()), lunch, transport);
         }
         FuelReading q = prev.get();
         return new PumpContext(false, yesterday, q.getReadingDate(),
                 new Values(q.getClosingManual(), q.getClosingVolume(), q.getClosingSales()),
-                pump.getFuelType(), price, lunch, transport);
+                pump.getFuelType(), price, discountOn(pump.getFuelType(), today()), lunch, transport);
     }
 
     public ReadingResponse submit(String username, ReadingRequest req) {
@@ -139,8 +142,8 @@ public class ReadingService {
         FuelReading r = readings.findByPumpAndReadingDate(pump, today())
                 .orElseThrow(() -> bad("Save today's readings for this pump first."));
         String company = req.companyName() == null ? "" : req.companyName().trim();
-        if (req.type() == CreditFill.Type.CREDITOR && company.isEmpty()) {
-            throw bad("Enter the creditor's company name.");
+        if (req.type() != CreditFill.Type.COMPANY && company.isEmpty()) {
+            throw bad("Enter the creditor's or customer's company name.");
         }
         fills.save(new CreditFill(r, req.type(), company, req.driverName().trim(),
                 req.vehicleReg().trim().toUpperCase(), req.litres()));
@@ -202,6 +205,40 @@ public class ReadingService {
         fp.set(req.pricePerLitre(), username);
         priceRepo.save(fp);
         return prices();
+    }
+
+    // ---------- discounts: discount per litre, set by the manager (stays in force until changed) ----------
+    private BigDecimal discountOn(String fuelType, LocalDate date) {
+        return discountRepo.findFirstByFuelTypeAndEffectiveDateLessThanEqualOrderByEffectiveDateDesc(fuelType, date)
+                .map(FuelDiscount::getDiscountPerLitre).orElse(ZERO);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DiscountInfo> discounts() {
+        LocalDate t = today();
+        return pumps.findAll().stream().map(Pump::getFuelType).distinct().sorted().map(type -> {
+            var cur = discountRepo.findFirstByFuelTypeAndEffectiveDateLessThanEqualOrderByEffectiveDateDesc(type, t);
+            var next = discountRepo.findFirstByFuelTypeAndEffectiveDateGreaterThanOrderByEffectiveDateAsc(type, t);
+            return new DiscountInfo(type, cur.map(FuelDiscount::getDiscountPerLitre).orElse(ZERO),
+                    cur.map(FuelDiscount::getEffectiveDate).orElse(null),
+                    next.map(FuelDiscount::getDiscountPerLitre).orElse(null),
+                    next.map(FuelDiscount::getEffectiveDate).orElse(null));
+        }).toList();
+    }
+
+    public List<DiscountInfo> setDiscount(String username, DiscountRequest req) {
+        String type = req.fuelType().trim().toUpperCase();
+        if (pumps.findAll().stream().noneMatch(p -> p.getFuelType().equals(type))) throw bad("Unknown fuel type.");
+        LocalDate date = req.effectiveDate() == null ? today() : req.effectiveDate();
+        if (date.isBefore(today())) throw bad("A new discount cannot start in the past.");
+        BigDecimal price = priceOn(type, date);
+        if (req.discountPerLitre().compareTo(price) > 0) {
+            throw bad("The discount cannot be more than the fuel price ($" + price.setScale(2, RoundingMode.HALF_UP) + " per litre).");
+        }
+        FuelDiscount fd = discountRepo.findByFuelTypeAndEffectiveDate(type, date).orElseGet(() -> new FuelDiscount(type, date));
+        fd.set(req.discountPerLitre(), username);
+        discountRepo.save(fd);
+        return discounts();
     }
 
     // ---------- currencies and branches (manager) ----------
@@ -291,8 +328,8 @@ public class ReadingService {
         List<FuelReading> rows = readings.findForManager(d, stationId);
         List<CashDeclaration> decl = cash.findByDeclDateAndAttendantStationId(d, stationId);
 
-        BigDecimal sales = ZERO, expected = ZERO, companyFuel = ZERO, lunch = ZERO, transport = ZERO, credit = ZERO;
-        Map<String, BigDecimal> creditors = new TreeMap<>(), litres = new TreeMap<>();
+        BigDecimal sales = ZERO, expected = ZERO, companyFuel = ZERO, lunch = ZERO, transport = ZERO, credit = ZERO, discountSum = ZERO;
+        Map<String, BigDecimal> creditors = new TreeMap<>(), discountors = new TreeMap<>(), litres = new TreeMap<>();
         Map<String, BigDecimal> expByPerson = new TreeMap<>(), decByPerson = new TreeMap<>();
         for (FuelReading r : rows) {
             ReadingResponse x = toResponse(r);
@@ -305,6 +342,9 @@ public class ReadingService {
             for (FillDto f : x.fills()) {
                 if (f.type().equals("COMPANY")) {
                     companyFuel = companyFuel.add(f.amount());
+                } else if (f.type().equals("DISCOUNT")) {
+                    discountSum = discountSum.add(f.amount());
+                    discountors.merge(f.companyName().isBlank() ? f.driverName() : f.companyName(), f.amount(), BigDecimal::add);
                 } else {
                     credit = credit.add(f.amount());
                     creditors.merge(f.companyName().isBlank() ? f.driverName() : f.companyName(), f.amount(), BigDecimal::add);
@@ -337,6 +377,7 @@ public class ReadingService {
         return new StationSummary(st.getId(), st.getName(), d, rows.size(), sales, expected, cashRows, declared,
                 companyFuel, lunch, transport, companyFuel.add(lunch).add(transport),
                 credit, creditors.entrySet().stream().map(e -> new CreditLine(e.getKey(), e.getValue())).toList(),
+                discountSum, discountors.entrySet().stream().map(e -> new CreditLine(e.getKey(), e.getValue())).toList(),
                 litres.entrySet().stream().map(e -> new FuelLitres(e.getKey(), e.getValue())).toList(), attendants,
                 stockSheet(stationId, d));
     }
@@ -471,6 +512,7 @@ public class ReadingService {
     // ---------- mapping ----------
     private ReadingResponse toResponse(FuelReading r) {
         BigDecimal price = priceOn(r.getPump().getFuelType(), r.getReadingDate());
+        BigDecimal discount = discountOn(r.getPump().getFuelType(), r.getReadingDate());
         Values o = new Values(r.getOpeningManual(), r.getOpeningVolume(), r.getOpeningSales());
         Values c = new Values(r.getClosingManual(), r.getClosingVolume(), r.getClosingSales());
         Values d = new Values(c.manual().subtract(o.manual()), c.volume().subtract(o.volume()),
@@ -478,7 +520,8 @@ public class ReadingService {
         List<FillDto> list = fills.findByReadingIdOrderById(r.getId()).stream()
                 .map(f -> new FillDto(f.getId(), f.getType().name(),
                         f.getCompanyName() == null ? "" : f.getCompanyName(), f.getDriverName(), f.getVehicleReg(),
-                        f.getLitres(), f.getLitres().multiply(price).setScale(2, RoundingMode.HALF_UP)))
+                        f.getLitres(), f.getLitres().multiply(f.getType() == CreditFill.Type.DISCOUNT ? discount : price)
+                                .setScale(2, RoundingMode.HALF_UP)))
                 .toList();
         BigDecimal credit = list.stream().map(FillDto::amount).reduce(ZERO, BigDecimal::add);
         return new ReadingResponse(r.getId(), r.getPump().getStation().getName(), r.getPump().getName(),

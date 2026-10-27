@@ -153,12 +153,12 @@
     </div>
 
     <div id="fillsCard" class="card hidden">
-      <h2>Company cars and creditors</h2>
-      <p class="meta">Fuel given out without cash. Its value (litres × today’s price) is taken off your cash.</p>
+      <h2>Company cars, creditors and discounts</h2>
+      <p class="meta">Company car and creditor fuel is valued at today’s price. A discount is valued at the discount per litre set by the manager. All of them are taken off your cash.</p>
       <div id="fillNote" class="info">Save today’s readings above first, then add the fills here.</div>
       <div id="fillForm" class="hidden">
         <div class="fillrow">
-          <div><label>Type</label><select id="ftype"><option value="COMPANY">Company car</option><option value="CREDITOR">Creditor</option></select></div>
+          <div><label>Type</label><select id="ftype" onchange="updateFillPreview()"><option value="COMPANY">Company car</option><option value="CREDITOR">Creditor</option><option value="DISCOUNT">Discount</option></select></div>
           <div><label>Company / creditor</label><input id="fcomp" placeholder="e.g. Helix"></div>
           <div><label>Driver’s name</label><input id="fdriver"></div>
           <div><label>Registration no.</label><input id="freg" placeholder="ABC 1234"></div>
@@ -222,6 +222,7 @@
   </div>
   <div id="m_set" class="hidden">
     <div id="prices" class="card"></div>
+    <div id="discounts" class="card"></div>
     <div id="currencies" class="card"></div>
   </div>
 </section>
@@ -239,10 +240,11 @@ const api = (path, opts = {}) => fetch(path, { ...opts, headers: { 'Authorizatio
 const badge = x => x.firstTimeSetup ? ' <span class="badge">Setup</span>' : '';
 const cell = (o, c) => { const d = c - o; return `<td class="${d < 0 ? 'neg' : ''}"><b>${sgn(d)}</b><small>${fmt(o)} → ${fmt(c)}</small></td>`; };
 const cells = x => F.map(f => cell(x.opening[f], x.closing[f])).join('');
+const typeLabel = t => ({ COMPANY: 'Company car', CREDITOR: 'Creditor', DISCOUNT: 'Discount' }[t] || t);
 const sumType = (x, type) => x.fills.filter(f => f.type === type).reduce((a, f) => a + Number(f.amount), 0);
 const fillCell = (x, type) => {
   const l = x.fills.filter(f => f.type === type);
-  return `<td>${money(sumType(x, type))}${l.map(f => `<small>${type === 'CREDITOR' && f.companyName ? esc(f.companyName) + ' · ' : ''}${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td>`;
+  return `<td>${money(sumType(x, type))}${l.map(f => `<small>${type !== 'COMPANY' && f.companyName ? esc(f.companyName) + ' · ' : ''}${esc(f.vehicleReg)} · ${esc(f.driverName)} · ${fmt(f.litres)} L</small>`).join('')}</td>`;
 };
 const stackCells = x => F.map(f => {
   const c = x.closing[f], o = x.opening[f], d = c - o;
@@ -318,7 +320,7 @@ async function login() {
     $('manager').classList.remove('hidden');
     $('sumStation').innerHTML = st.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
     $('sumDate').value = today;
-    loadSummary(); loadManager(); loadPrices(); loadCurrencies();
+    loadSummary(); loadManager(); loadPrices(); loadDiscounts(); loadCurrencies();
   } else {
     $('attendant').classList.remove('hidden');
     await loadMine(); await loadCash();
@@ -344,7 +346,7 @@ async function selectPump(id) {
   $('setupBox').classList.toggle('hidden', !setup);
   F.forEach(f => { $('c_' + f).value = ex ? ex.closing[f] : ''; });
   $('astation').textContent = me.station;
-  $('priceLine').innerHTML = `${esc(cap(ctx.fuelType.toLowerCase()))} at <b>${money(ctx.pricePerLitre)}</b> per litre`;
+  $('priceLine').innerHTML = `${esc(cap(ctx.fuelType.toLowerCase()))} at <b>${money(ctx.pricePerLitre)}</b> per litre <span class="meta">· discount ${money(ctx.discountPerLitre)} per litre</span>`;
   $('expBox').classList.toggle('hidden', !ctx.lunchAllowed || setup);
   $('transWrap').classList.toggle('hidden', !ctx.transportAllowed);
   $('lunch').value = ex && ex.lunchAmount ? ex.lunchAmount : ''; $('transport').value = ex && ex.transportAmount ? ex.transportAmount : '';
@@ -413,7 +415,8 @@ async function loadMine() {
 
 function updateFillPreview() {
   const ex = mineFor(sel), l = parseFloat($('flit').value);
-  $('famt').textContent = money(ex && !isNaN(l) ? l * ex.pricePerLitre : 0);
+  const rate = $('ftype').value === 'DISCOUNT' ? Number(ctx.discountPerLitre) : (ex ? Number(ex.pricePerLitre) : 0);
+  $('famt').textContent = money(ex && !isNaN(l) ? l * rate : 0);
 }
 
 function renderFills() {
@@ -423,10 +426,10 @@ function renderFills() {
   $('fillForm').classList.toggle('hidden', !ex);
   $('fillList').innerHTML = ex && ex.fills.length
     ? `<table><tr><th class="l">Type</th><th class="l">Company</th><th class="l">Driver</th><th class="l">Reg. no.</th><th>Litres</th><th>Amount</th><th></th></tr>${ex.fills.map(f =>
-        `<tr><td class="l">${f.type === 'COMPANY' ? 'Company car' : 'Creditor'}</td><td class="l">${esc(f.companyName)}</td><td class="l">${esc(f.driverName)}</td><td class="l">${esc(f.vehicleReg)}</td><td>${fmt(f.litres)}</td><td>${money(f.amount)}</td><td><button class="x" onclick="delFill(${f.id})">Remove</button></td></tr>`).join('')}</table>` : '';
+        `<tr><td class="l">${typeLabel(f.type)}</td><td class="l">${esc(f.companyName)}</td><td class="l">${esc(f.driverName)}</td><td class="l">${esc(f.vehicleReg)}</td><td>${fmt(f.litres)}</td><td>${money(f.amount)}</td><td><button class="x" onclick="delFill(${f.id})">Remove</button></td></tr>`).join('')}</table>` : '';
   $('cashCard').innerHTML = ex ? `<h2>${esc(ex.pump)}: cash for ${dfmt(ex.date)}</h2>
     <div><span>Sales (closing minus previous)</span><b>${money(ex.difference.sales)}</b></div>
-    <div><span>Less: company cars and creditors</span><b>-${money(ex.creditTotal)}</b></div>
+    <div><span>Less: company cars, creditors and discounts</span><b>-${money(ex.creditTotal)}</b></div>
     <div class="total"><span>Total cash</span><b>${money(ex.cashTotal)}</b></div>` : '';
   const day = mine.filter(x => x.date === today);
   $('dayTotal').innerHTML = day.length ? `<h2>My total cash today</h2>${day.map(x => `<div><span>${esc(x.pump)}</span><b>${money(x.cashTotal)}</b></div>`).join('')}
@@ -497,7 +500,7 @@ async function loadHistory() {
   const days = [...Array(7)].map((_, i) => { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - i); return d.toLocaleDateString('en-CA'); });
   const all = (await Promise.all(days.map(d => api('/api/readings/mine?date=' + d).then(r => r.json())))).flat();
   $('histBody').innerHTML = all.length
-    ? `<table><tr><th class="l">Date / pump</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Credit</th><th>Cash</th></tr>${all.map(x =>
+    ? `<table><tr><th class="l">Date / pump</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Cars, credit &amp; discount</th><th>Cash</th></tr>${all.map(x =>
         `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>${esc(x.pump)} · $${fmt(x.pricePerLitre)}/L</small></td>${cells(x)}<td>${money(x.creditTotal)}</td><td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>`
     : '<span class="meta">No readings in the last 7 days.</span>';
 }
@@ -511,9 +514,9 @@ async function loadManager() {
   const sumD = (l, f) => l.reduce((a, x) => a + x.difference[f], 0), sumK = (l, k) => l.reduce((a, x) => a + Number(x[k]), 0);
   const flagged = rows.filter(x => F.some(f => x.difference[f] < 0)).length;
   const grp = k => { const g = {}; rows.forEach(x => (g[x[k]] = g[x[k]] || []).push(x)); return Object.entries(g); };
-  const tot = l => `<td>${fmt(sumD(l, 'volume'))}</td><td>${money(sumD(l, 'sales'))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'COMPANY'), 0))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'CREDITOR'), 0))}</td><td><b>${money(sumK(l, 'cashTotal'))}</b></td>`;
+  const tot = l => `<td>${fmt(sumD(l, 'volume'))}</td><td>${money(sumD(l, 'sales'))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'COMPANY'), 0))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'CREDITOR'), 0))}</td><td>${money(l.reduce((a, x) => a + sumType(x, 'DISCOUNT'), 0))}</td><td><b>${money(sumK(l, 'cashTotal'))}</b></td>`;
   const table = (title, key) => `<div class="card scroll"><h2>${title} - ${dfmt($('date').value)}</h2>
-    <table><tr><th class="l">${key === 'station' ? 'Station' : 'Attendant'}</th><th>Pumps</th><th>Litres</th><th>Sales</th><th>Company cars</th><th>Credit</th><th>Cash</th></tr>
+    <table><tr><th class="l">${key === 'station' ? 'Station' : 'Attendant'}</th><th>Pumps</th><th>Litres</th><th>Sales</th><th>Company cars</th><th>Credit</th><th>Discount</th><th>Cash</th></tr>
     ${grp(key).map(([n, l]) => `<tr><td class="l">${esc(n)}</td><td>${l.length}</td>${tot(l)}</tr>`).join('')}</table></div>`;
   const max = Math.max(1, ...rows.map(x => x.difference.sales));
 
@@ -522,7 +525,7 @@ async function loadManager() {
       <div class="tile"><span class="meta">Pumps reported</span><b>${rows.length}</b></div>
       <div class="tile"><span class="meta">Litres dispensed</span><b>${fmt(sumD(rows, 'volume'))}</b></div>
       <div class="tile"><span class="meta">Sales</span><b>${money(sumD(rows, 'sales'))}</b></div>
-      <div class="tile"><span class="meta">Company cars + creditors</span><b>${money(sumK(rows, 'creditTotal'))}</b></div>
+      <div class="tile"><span class="meta">Cars + credit + discounts</span><b>${money(sumK(rows, 'creditTotal'))}</b></div>
       <div class="tile"><span class="meta">Total cash</span><b>${money(sumK(rows, 'cashTotal'))}</b></div>
       <div class="tile" style="border-left-color:${flagged ? 'var(--bad)' : 'var(--good)'}"><span class="meta">Need attention</span><b class="${flagged ? 'neg' : ''}">${flagged}</b></div>
     </div>
@@ -531,8 +534,8 @@ async function loadManager() {
       ${rows.map(x => { const d = x.difference.sales;
         return `<div class="bar"><span>${esc(x.pump)}<i>${esc(x.station)}</i></span><div class="track"><div class="fill ${d < 0 ? 'neg' : ''}" style="width:${Math.max(0, d) / max * 100}%"></div></div><b class="${d < 0 ? 'neg' : ''}">${money(d)}</b></div>`; }).join('')}</div>
     <div class="card scroll"><h2>All readings</h2>
-      <table><tr><th class="l">Date</th><th class="l">Station / pump</th><th class="l">Attendant</th><th>Price/L</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Company cars</th><th>Credit</th><th>Cash</th></tr>
-      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>previous closing: ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${stackCells(x)}${fillCell(x, 'COMPANY')}${fillCell(x, 'CREDITOR')}<td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
+      <table><tr><th class="l">Date</th><th class="l">Station / pump</th><th class="l">Attendant</th><th>Price/L</th><th>Manual</th><th>Volume</th><th>Sales</th><th>Company cars</th><th>Credit</th><th>Discount</th><th>Cash</th></tr>
+      ${rows.map(x => `<tr><td class="l">${dfmt(x.date)}${badge(x)}<small>previous closing: ${dfmt(x.openingDate)}</small></td><td class="l">${esc(x.station)}<small>${esc(x.pump)}</small></td><td class="l">${esc(x.attendant)}</td><td>${money(x.pricePerLitre)}</td>${stackCells(x)}${fillCell(x, 'COMPANY')}${fillCell(x, 'CREDITOR')}${fillCell(x, 'DISCOUNT')}<td><b>${money(x.cashTotal)}</b></td></tr>`).join('')}</table>
       <p class="meta">In the Manual, Volume and Sales columns: top = closing reading, middle = previous day’s closing (today’s opening), bottom = difference. Cash = sales difference minus company-car and creditor fills. Red = lower than the previous reading.</p></div>`;
 }
 
@@ -553,9 +556,9 @@ const rblock = x => `<div style="margin:16px 0"><b>${esc(x.pump)}</b>${badge(x)}
     <tr><td class="l">Previous closing<br><small>${dfmt(x.openingDate)}</small></td><td>${fmt(x.opening.manual)}</td><td>${fmt(x.opening.volume)}</td><td>${money(x.opening.sales)}</td></tr>
     <tr class="diff"><td class="l">Difference</td><td>${fmt(x.difference.manual)}</td><td>${fmt(x.difference.volume)}</td><td>${money(x.difference.sales)}</td></tr></table></div>
   ${x.fills.length ? `<div class="scroll"><table style="margin-top:8px"><tr><th class="l">Type</th><th class="l">Company</th><th class="l">Driver</th><th class="l">Reg. no.</th><th>Litres</th><th>Amount</th></tr>
-    ${x.fills.map(f => `<tr><td class="l">${f.type === 'COMPANY' ? 'Company car' : 'Creditor'}</td><td class="l">${esc(f.companyName)}</td><td class="l">${esc(f.driverName)}</td><td class="l">${esc(f.vehicleReg)}</td><td>${fmt(f.litres)}</td><td>${money(f.amount)}</td></tr>`).join('')}</table></div>` : ''}
+    ${x.fills.map(f => `<tr><td class="l">${typeLabel(f.type)}</td><td class="l">${esc(f.companyName)}</td><td class="l">${esc(f.driverName)}</td><td class="l">${esc(f.vehicleReg)}</td><td>${fmt(f.litres)}</td><td>${money(f.amount)}</td></tr>`).join('')}</table></div>` : ''}
   <div class="cashbox" style="margin-top:8px"><div><span>Sales</span><b>${money(x.difference.sales)}</b></div>
-    <div><span>Less: company cars and creditors</span><b>-${money(x.creditTotal)}</b></div>
+    <div><span>Less: company cars, creditors and discounts</span><b>-${money(x.creditTotal)}</b></div>
     <div class="total"><span>Total cash</span><b>${money(x.cashTotal)}</b></div>
     ${x.lunchAmount > 0 || x.transportAmount > 0 ? `<div><span>Lunch ${money(x.lunchAmount)} · Transport ${money(x.transportAmount)}</span><b></b></div>` : ''}</div></div>`;
 
@@ -659,6 +662,7 @@ function renderSummary(s, target) {
       ? `<tr><td class="l"><b>${fuelName(x)}</b></td><td colspan="5" class="meta" style="text-align:left">${x.beforeStart ? 'Before the first stock day (' + dfmt(x.baselineDate) + ')' : 'Not entered by the supervisor yet'}</td></tr>`
       : `<tr><td class="l"><b>${fuelName(x)}</b>${x.baselineDay ? ' <span class="badge">Starting stock</span>' : ''}</td><td>${x.baselineDay ? '-' : fmt(x.opening)}</td><td>${x.baselineDay ? '-' : fmt(x.deliveries)}</td><td>${x.baselineDay ? '-' : fmt(x.returns)}</td><td>${x.baselineDay ? '-' : fmt(x.salesLitres)}</td><td><b class="${x.closing < 0 ? 'neg' : ''}">${fmt(x.closing)}</b></td></tr>`).join('')}</table>
     <p class="meta">Closing = opening + deliveries + returns − litres sold by all pumps of that fuel. Opening = the previous day’s closing. Litres in L.</p></div>`;
+  const discounts = s.discounts.map(c => `<tr class="sub"><td class="l">&nbsp;&nbsp;↳ ${esc(c.name)}</td><td>${money(c.amount)}</td><td></td></tr>`).join('');
   const credits = s.credits.map(c => `<tr class="sub"><td class="l">&nbsp;&nbsp;↳ ${esc(c.name)}</td><td>${money(c.amount)}</td><td></td></tr>`).join('');
   $(target).innerHTML = `
     <div class="card scroll"><h2>${esc(s.station)}: ${dfmt(s.date)}</h2>
@@ -670,6 +674,8 @@ function renderSummary(s, target) {
           <td class="l"><small>Company cars ${money(s.companyFuel)} · Lunch ${money(s.lunch)} · Transport ${money(s.transport)}</small></td></tr>
         <tr><td class="l"><b>Credit</b></td><td><b>${money(s.creditTotal)}</b></td><td></td></tr>
         ${credits || '<tr class="sub"><td class="l">&nbsp;&nbsp;No credit</td><td></td><td></td></tr>'}
+        <tr><td class="l"><b>Discount</b></td><td><b>${money(s.discountTotal)}</b></td><td></td></tr>
+        ${discounts || '<tr class="sub"><td class="l">&nbsp;&nbsp;No discounts</td><td></td><td></td></tr>'}
       </table></div>
     <div class="card scroll"><table class="sumT"><tr><th class="l">Total sales and expense litres</th><th>Litres</th></tr>
       ${s.litres.map(x => `<tr><td class="l">${esc(cap(x.fuelType.toLowerCase()))}</td><td><b>${fmt(x.litres)} L</b></td></tr>`).join('') || '<tr class="sub"><td class="l">No readings</td><td></td></tr>'}</table></div>
@@ -722,6 +728,28 @@ async function toggleAccept(id) {
   $('cumsg').className = r.ok ? 'ok' : 'err'; $('cumsg').textContent = r.ok ? 'Branch currencies saved.' : 'Could not save.';
 }
 
+async function loadDiscounts() {
+  const list = await (await api('/api/manager/discounts')).json();
+  $('discounts').innerHTML = `<h2>Discount per litre</h2>
+    <p class="meta">The amount taken off each litre for discounted customers. It stays in force every day until you change it. When an attendant records a discount, litres × this amount is taken off their cash.</p>
+    <div class="scroll"><table><tr><th class="l">Fuel</th><th>Current discount</th><th>In force since</th><th>New discount ($ per litre)</th><th>From date</th><th></th></tr>
+    ${list.map(p => `<tr><td class="l"><b>${esc(cap(p.fuelType.toLowerCase()))}</b>${p.nextDiscount != null ? `<small>Scheduled: ${money(p.nextDiscount)} from ${dfmt(p.nextDate)}</small>` : ''}</td>
+      <td><b>${money(p.discountPerLitre)}</b></td><td>${p.since ? dfmt(p.since) : 'Not set yet'}</td>
+      <td><input id="dp_${p.fuelType}" type="number" step="0.01" min="0" inputmode="decimal" style="width:110px"></td>
+      <td><input id="dd_${p.fuelType}" type="date" min="${today}" value="${today}" style="width:160px"></td>
+      <td><button onclick="setDiscount('${p.fuelType}')">Update</button></td></tr>`).join('')}</table></div><div id="dmsg"></div>`;
+}
+
+async function setDiscount(t) {
+  const v = parseFloat($('dp_' + t).value), d = $('dd_' + t).value;
+  $('dmsg').className = 'err';
+  if (isNaN(v) || v < 0) { $('dmsg').textContent = 'Enter the discount per litre (0 or more).'; return; }
+  const r = await api('/api/manager/discounts', { method: 'POST', body: JSON.stringify({ fuelType: t, discountPerLitre: v, effectiveDate: d || null }) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); $('dmsg').textContent = e.message || 'Could not save the discount.'; return; }
+  await loadDiscounts(); await loadManager();
+  $('dmsg').className = 'ok'; $('dmsg').textContent = 'Discount updated.';
+}
+
 async function loadPrices() {
   const list = await (await api('/api/manager/prices')).json();
   $('prices').innerHTML = `<h2>Fuel prices per litre</h2>
@@ -748,12 +776,12 @@ function exportCsv() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const hd = ['Date', 'Station', 'Pump', 'Attendant', 'Price per litre', 'First-time setup', 'Opening taken from'];
   F.forEach(f => hd.push(cap(f) + ' opening', cap(f) + ' closing', cap(f) + ' difference'));
-  hd.push('Company cars total', 'Credit total (creditors)', 'Cash total', 'Company cars and creditors');
+  hd.push('Company cars total', 'Credit total (creditors)', 'Discount total', 'Cash total', 'Company cars, creditors and discounts');
   const lines = [hd.map(q).join(',')];
   rows.forEach(x => {
     const l = [x.date, x.station, x.pump, x.attendant, x.pricePerLitre, x.firstTimeSetup ? 'yes' : 'no', x.openingDate];
     F.forEach(f => l.push(x.opening[f], x.closing[f], x.difference[f]));
-    l.push(sumType(x, 'COMPANY'), sumType(x, 'CREDITOR'), x.cashTotal, x.fills.map(f => `${f.type} ${f.companyName} ${f.vehicleReg} ${f.driverName} ${f.litres}L $${f.amount}`).join('; '));
+    l.push(sumType(x, 'COMPANY'), sumType(x, 'CREDITOR'), sumType(x, 'DISCOUNT'), x.cashTotal, x.fills.map(f => `${f.type} ${f.companyName} ${f.vehicleReg} ${f.driverName} ${f.litres}L $${f.amount}`).join('; '));
     lines.push(l.map(q).join(','));
   });
   const a = document.createElement('a');

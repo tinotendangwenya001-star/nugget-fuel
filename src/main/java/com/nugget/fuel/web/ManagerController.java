@@ -59,4 +59,14 @@ public class ManagerController {
     public List<StationInfo> stationCurrencies(@PathVariable Long id, @Valid @RequestBody StationCurrenciesRequest req) {
         return service.setStationCurrencies(id, req);
     }
+
+    /** Discount per litre for each fuel type (and any scheduled change). */
+    @GetMapping("/discounts")
+    public List<DiscountInfo> discounts() { return service.discounts(); }
+
+    /** Manager sets the discount per litre, effective today or from a later date. */
+    @PostMapping("/discounts")
+    public List<DiscountInfo> setDiscount(@Valid @RequestBody DiscountRequest req, Principal p) {
+        return service.setDiscount(p.getName(), req);
+    }
 }

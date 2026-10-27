@@ -41,6 +41,12 @@ public final class Dtos {
     public record AttendantPage(String attendant, List<ReadingResponse> readings, List<CashLine> cash,
             BigDecimal expectedUsd, BigDecimal declaredUsd) {}
 
+    // ----- discount per litre, set by the manager -----
+    public record DiscountInfo(String fuelType, BigDecimal discountPerLitre, LocalDate since,
+                               BigDecimal nextDiscount, LocalDate nextDate) {}
+    public record DiscountRequest(@NotBlank String fuelType, @NotNull @PositiveOrZero BigDecimal discountPerLitre,
+                                  LocalDate effectiveDate) {}
+
     // ----- manager's daily branch summary -----
     public record CurrencyTotal(String code, String name, BigDecimal amount, BigDecimal rate, BigDecimal usdValue) {}
     public record CreditLine(String name, BigDecimal amount) {}
@@ -52,6 +58,7 @@ public final class Dtos {
             List<CurrencyTotal> cash, BigDecimal declaredUsd,
             BigDecimal companyFuel, BigDecimal lunch, BigDecimal transport, BigDecimal expensesTotal,
             BigDecimal creditTotal, List<CreditLine> credits,
+            BigDecimal discountTotal, List<CreditLine> discounts,
             List<FuelLitres> litres, List<AttendantCash> attendants,
             List<StockLine> stock) {}
 }

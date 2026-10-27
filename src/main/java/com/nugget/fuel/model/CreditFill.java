@@ -3,10 +3,11 @@ package com.nugget.fuel.model;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 
-/** Fuel given to a company car or a creditor (no cash taken). Value = litres x that day's price. */
+/** Fuel given to a company car or a creditor (no cash taken), or a discounted sale.
+ * Value = litres x that day's price (company car, creditor) or litres x the discount per litre (discount). */
 @Entity
 public class CreditFill {
-    public enum Type { COMPANY, CREDITOR }
+    public enum Type { COMPANY, CREDITOR, DISCOUNT }
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

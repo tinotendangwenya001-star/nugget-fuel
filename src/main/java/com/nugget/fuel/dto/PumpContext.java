@@ -10,6 +10,7 @@ public record PumpContext(
         LocalDate openingDate,
         Values opening,
         String fuelType,
-        BigDecimal pricePerLitre,    // today's price, set by the manager
-        boolean lunchAllowed,        // Diesel Pump B
-        boolean transportAllowed) {} // Diesel Pump B on a Monday
+        BigDecimal pricePerLitre,      // today's price, set by the manager
+        BigDecimal discountPerLitre,   // today's discount per litre, set by the manager
+        boolean lunchAllowed,          // Diesel Pump B
+        boolean transportAllowed) {}   // Diesel Pump B on a Monday
